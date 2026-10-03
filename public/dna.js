@@ -72,9 +72,9 @@
     ctx.clearRect(0, 0, W, H);
 
     // ambil warna theme
-    const accent  = getColor("--accent",  "#00d4ff");
-    const accent3 = getColor("--accent-3", "#a855f7");
-    const accent4 = getColor("--accent-4", "#00ff9d");
+    const accent  = getColor("--accent",  "#16a34a");
+    const accent3 = getColor("--accent-3", "#8b5cf6");
+    const accent4 = getColor("--accent-4", "#0ea5e9");
 
     // ── Layout dinamis ──
     const cx = W * 0.5;
