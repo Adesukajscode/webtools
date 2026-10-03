@@ -1,12 +1,12 @@
 const TOOL_TITLES = {hash:"Hash Generator",base64:"Base64 Encoder/Decoder",url:"URL Encoder/Decoder",hex:"Hex Encoder/Decoder",jwt:"JWT Decoder",uuid:"UUID Generator",password:"Password Generator",qr:"QR Code Generator",json:"JSON Formatter",regex:"Regex Tester",color:"Color Converter",cron:"Cron Parser",ip:"IP Lookup",text:"Text Utilities",time:"Timestamp",tiktok:"TikTok Downloader"};
 let toastTimer;
-function toast(msg,type){type=type||"info";var el=document.getElementById("toast");el.textContent=msg;el.className="toast show "+type;clearTimeout(toastTimer);toastTimer=setTimeout(function(){el.classList.remove("show")},2500)}
+function toast(msg,type){type=type||"info";var el=document.getElementById("toast");if(!el)return;el.textContent=msg;el.className="toast show "+type;clearTimeout(toastTimer);toastTimer=setTimeout(function(){el.classList.remove("show")},2500)}
 async function copyText(text){try{await navigator.clipboard.writeText(text);toast("Copied","success")}catch(e){var ta=document.createElement("textarea");ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand("copy");document.body.removeChild(ta);toast("Copied","success")}}
 function initTheme(){var saved=localStorage.getItem("theme")||"dark";document.documentElement.setAttribute("data-theme",saved);var icon=document.getElementById("theme-icon");if(icon)icon.setAttribute("data-icon",saved==="dark"?"moon":"sun")}
 function toggleTheme(){var cur=document.documentElement.getAttribute("data-theme");var next=cur==="dark"?"light":"dark";document.documentElement.setAttribute("data-theme",next);localStorage.setItem("theme",next);var icon=document.getElementById("theme-icon");if(icon)icon.setAttribute("data-icon",next==="dark"?"moon":"sun");if(typeof applyIcons==="function")applyIcons()}
 function switchTool(tool){document.querySelectorAll('.nav button').forEach(function(b){b.classList.toggle("active",b.dataset.tool===tool)});document.querySelectorAll(".tool").forEach(function(t){t.classList.remove("active")});var target=document.getElementById("tool-"+tool);if(target)target.classList.add("active");document.getElementById("current-tool-title").textContent=TOOL_TITLES[tool]||tool;localStorage.setItem("lastTool",tool);document.getElementById("sidebar").classList.remove("open");document.getElementById("overlay").classList.remove("show")}
 function filterTools(q){var nav=document.getElementById("nav");var buttons=nav.querySelectorAll("button");var visible=0;q=q.toLowerCase().trim();buttons.forEach(function(btn){var name=TOOL_TITLES[btn.dataset.tool].toLowerCase();var match=!q||name.includes(q);btn.style.display=match?"":"none";if(match)visible++});var empty=nav.querySelector(".nav-empty");if(visible===0){if(!empty){empty=document.createElement("div");empty.className="nav-empty";empty.textContent="Tidak ada tool cocok";nav.appendChild(empty)}}else if(empty)empty.remove()}
-function out(id,html){document.getElementById(id).innerHTML=html}
+function out(id,html){var el=document.getElementById(id);if(el)el.innerHTML=html}
 function esc(s){return String(s).replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]})}
 function kv(k,v){return '<div><span class="key">'+esc(k)+'</span>: <span class="val">'+esc(v)+'</span></div>'}
 async function genHash(algo){var text=document.getElementById("hash-input").value;if(!text)return toast("Isi teks dulu","error");var enc=new TextEncoder().encode(text);var buf=await crypto.subtle.digest(algo,enc);var hex=Array.from(new Uint8Array(buf)).map(function(b){return b.toString(16).padStart(2,"0")}).join("");out("hash-output",kv(algo,hex))}
@@ -27,7 +27,7 @@ function jsonFormat(n){try{out("json-output",esc(JSON.stringify(JSON.parse(docum
 function jsonMinify(){try{out("json-output",esc(JSON.stringify(JSON.parse(document.getElementById("json-input").value))))}catch(e){out("json-output",'<span class="err">'+e.message+'</span>')}}
 function jsonValidate(){try{JSON.parse(document.getElementById("json-input").value);out("json-output",'<span class="val">JSON valid</span>')}catch(e){out("json-output",'<span class="err">'+e.message+'</span>')}}
 function testRegex(){try{var p=document.getElementById("regex-pattern").value;var f=document.getElementById("regex-flags").value;var t=document.getElementById("regex-text").value;var re=new RegExp(p,f);var matches=Array.from(t.matchAll(re));var html=kv("total matches",matches.length);if(matches.length){html+='<div style="margin-top:8px"><span class="key">matches:</span></div>';matches.slice(0,50).forEach(function(m,i){html+='<div>  ['+i+'] <span class="val">"'+esc(m[0])+'"</span> <span class="dim">@ '+m.index+'</span></div>'})}out("regex-output",html)}catch(e){out("regex-output",'<span class="err">'+e.message+'</span>')}}
-function convertColor(){var c=document.getElementById("color-input").value.trim();try{var r,g,b;if(c.startsWith("#")){var h=c.slice(1);var full=h.length===3?h.split("").map(function(x){return x+x}).join(""):h;r=parseInt(full.slice(0,2),16);g=parseInt(full.slice(2,4),16);b=parseInt(full.slice(4,6),16)}else if(c.startsWith("rgb")){var nums=c.match(/\d+/g).map(Number);r=nums[0];g=nums[1];b=nums[2]}else{var n=c.match(/[\d.]+/g);var hh=parseFloat(n[0]),ss=parseFloat(n[1]),ll=parseFloat(n[2]);var s=ss/100,l=ll/100;var k=function(x){return(x+hh/30)%12};var a=s*Math.min(l,1-l);var f=function(x){return l-a*Math.max(-1,Math.min(k(x)-3,Math.min(9-k(x),1)))};r=Math.round(f(0)*255);g=Math.round(f(8)*255);b=Math.round(f(4)*255)}var hex="#"+[r,g,b].map(function(x){return x.toString(16).padStart(2,"0")}).join("");var max=Math.max(r,g,b)/255,min=Math.min(r,g,b)/255;var l=(max+min)/2,h2=0,s2=0;if(max!==min){var d=max-min;s2=l>.5?d/(2-max-min):d/(max+min);h2=max===r/255?((g/255-b/255)/d+(g<b?6:0)):max===g/255?((b/255-r/255)/d+2):((r/255-g/255)/d+4);h2*=60}var html=kv("HEX",hex)+kv("RGB","rgb("+r+","+g+","+b+")")+kv("HSL","hsl("+h2.toFixed(1)+","+(s2*100).toFixed(1)+"%,"+(l*100).toFixed(1)+"%)");html+='<div style="margin-top:10px;height:64px;background:'+hex+';border-radius:8px;border:1px solid var(--border)"></div>';out("color-output",html);document.getElementById("color-picker").value=hex}catch(e){out("color-output",'<span class="err">Format warna tidak dikenali</span>')}}
+function convertColor(){var c=document.getElementById("color-input").value.trim();try{var r,g,b;if(c.startsWith("#")){var h=c.slice(1);var full=h.length===3?h.split("").map(function(x){return x+x}).join(""):h;r=parseInt(full.slice(0,2),16);g=parseInt(full.slice(2,4),16);b=parseInt(full.slice(4,6),16)}else if(c.startsWith("rgb")){var nums=c.match(/\d+/g).map(Number);r=nums[0];g=nums[1];b=nums[2]}else{var n=c.match(/[\d.]+/g);var hh=parseFloat(n[0]),ss=parseFloat(n[1]),ll=parseFloat(n[2]);var s=ss/100,l=ll/100;var k=function(x){return(x+hh/30)%12};var a=s*Math.min(l,1-l);var f=function(x){return l-a*Math.max(-1,Math.min(k(x)-3,Math.min(9-k(x),1)))};r=Math.round(f(0)*255);g=Math.round(f(8)*255);b=Math.round(f(4)*255)}var hex="#"+[r,g,b].map(function(x){return x.toString(16).padStart(2,"0")}).join("");var max=Math.max(r,g,b)/255,min=Math.min(r,g,b)/255;var l=(max+min)/2,h2=0,s2=0;if(max!==min){var d=max-min;s2=l>.5?d/(2-max-min):d/(max+min);h2=max===r/255?((g/255-b/255)/d+(g<b?6:0)):max===g/255?((b/255-r/255)/d+2):((r/255-g/255)/d+4);h2*=60}var html=kv("HEX",hex)+kv("RGB","rgb("+r+","+g+","+b+")")+kv("HSL","hsl("+h2.toFixed(1)+","+(s2*100).toFixed(1)+"%,"+(l*100).toFixed(1)+"%)");html+='<div style="margin-top:10px;height:64px;background:'+hex+';border-radius:8px;border:1px solid var(--border)"></div>';out("color-output",html);var cp=document.getElementById("color-picker");if(cp)cp.value=hex}catch(e){out("color-output",'<span class="err">Format warna tidak dikenali</span>')}}
 function parseCron(){var c=document.getElementById("cron-input").value.trim();var parts=c.split(/\s+/);if(parts.length!==5)return out("cron-output",'<span class="err">Butuh 5 field</span>');var m=parts[0],h=parts[1],dom=parts[2],mo=parts[3],dow=parts[4];var html="";[["minute",m],["hour",h],["day of month",dom],["month",mo],["day of week",dow]].forEach(function(p){html+=kv(p[0],p[1])});var desc="Jalan ";if(m==="*"&&h==="*")desc+="setiap menit";else if(m.indexOf("*/")===0)desc+="setiap "+m.slice(2)+" menit";else desc+="pada menit "+m;if(h!=="*")desc+=", jam "+h;if(dom!=="*")desc+=", tanggal "+dom;if(mo!=="*")desc+=", bulan "+mo;if(dow!=="*")desc+=", hari ke-"+dow;html+='<div style="margin-top:8px"><span class="key">perkiraan:</span> <span class="val">'+esc(desc)+'</span></div>';out("cron-output",html)}
 async function lookupIP(){var ip=document.getElementById("ip-input").value.trim();out("ip-output",'<span class="dim">querying...</span>');try{var url=ip?"https://ipapi.co/"+ip+"/json/":"https://ipapi.co/json/";var r=await fetch(url);var d=await r.json();if(d.error)return out("ip-output",'<span class="err">'+(d.reason||"error")+'</span>');var html="";["ip","city","region","country_name","postal","latitude","longitude","timezone","org","asn"].forEach(function(k){if(d[k])html+=kv(k,d[k])});out("ip-output",html)}catch(e){out("ip-output",'<span class="err">'+e.message+'</span>')}}
 function textStats(){var t=document.getElementById("text-input").value;var words=t.trim()?t.trim().split(/\s+/).length:0;var html=kv("characters",t.length)+kv("words",words)+kv("lines",t.split("\n").length)+kv("bytes",new TextEncoder().encode(t).length);out("text-output",html)}
@@ -35,11 +35,12 @@ function textCase(mode){var t=document.getElementById("text-input").value;var ma
 function timeNow(){var now=new Date();var html=kv("unix (s)",Math.floor(now.getTime()/1000))+kv("unix (ms)",now.getTime())+kv("ISO",now.toISOString())+kv("local",now.toLocaleString())+kv("UTC",now.toUTCString());out("time-output",html)}
 function timeParse(){var v=document.getElementById("time-input").value.trim()||Date.now();var d=new Date(/^\d+$/.test(v)?(+v<1e12?+v*1000:+v):v);if(isNaN(d))return out("time-output",'<span class="err">format tidak valid</span>');var html=kv("ISO",d.toISOString())+kv("local",d.toLocaleString())+kv("UTC",d.toUTCString())+kv("unix",Math.floor(d.getTime()/1000));out("time-output",html)}
 
-// ─── TIKTOK (via Cloudflare Function) ───
+// ─── TIKTOK ───
 async function tiktokFetch(){
-  var url=document.getElementById("tiktok-input").value.trim();
+  var input=document.getElementById("tiktok-input");
+  if(!input)return;
+  var url=input.value.trim();
   if(!url)return toast("Paste URL TikTok dulu","error");
-  if(!/tiktok\.com|douyin\.com/i.test(url))return toast("URL bukan dari TikTok","error");
 
   out("tiktok-output",'<span class="dim">Mengambil data...</span>');
   out("tiktok-preview","");
@@ -48,10 +49,11 @@ async function tiktokFetch(){
     var apiUrl="/api/tiktok?url="+encodeURIComponent(url)+"&hd=1";
     var r=await fetch(apiUrl);
 
-    // cek dulu apakah respons JSON
-    var ct=r.headers.get("content-type")||"";
-    if(!ct.includes("json")){
-      return out("tiktok-output",'<span class="err">Server return non-JSON ('+r.status+'). Cek function /api/tiktok sudah deploy atau belum.</span>');
+    var ct=(r.headers.get("content-type")||"").toLowerCase();
+
+    if(ct.indexOf("json")===-1){
+      var txt=await r.text();
+      return out("tiktok-output",'<span class="err">Server balas non-JSON (HTTP '+r.status+').</span>\n<span class="dim">'+(txt.slice(0,200))+'</span>\n<span class="dim">Cek: folder functions/api/tiktok.js sudah di-deploy?</span>');
     }
 
     var d=await r.json();
@@ -78,14 +80,17 @@ async function tiktokFetch(){
 
     html+='<div style="margin-top:14px;padding:12px;background:var(--bg-3);border-radius:8px"><span class="key" style="font-size:14px">DOWNLOAD LINK</span></div>';
 
-    if(d.video&&d.video.no_watermark){
-      html+='<div style="margin-top:8px"><span class="key">Video HD (no watermark):</span><br><a href="'+d.video.no_watermark+'" target="_blank" rel="noopener" style="color:var(--accent);word-break:break-all;font-size:12px">'+d.video.no_watermark+'</a></div>';
-    }
-    if(d.video&&d.video.hd){
-      html+='<div style="margin-top:8px"><span class="key">Video Full HD:</span><br><a href="'+d.video.hd+'" target="_blank" rel="noopener" style="color:var(--accent);word-break:break-all;font-size:12px">'+d.video.hd+'</a></div>';
-    }
-    if(d.audio&&d.audio.url){
-      html+='<div style="margin-top:8px"><span class="key">Audio MP3:</span><br><a href="'+d.audio.url+'" target="_blank" rel="noopener" style="color:var(--success);word-break:break-all;font-size:12px">'+d.audio.url+'</a></div>';
+    var links=[];
+    if(d.video&&d.video.no_watermark)links.push({label:"Video HD (no watermark)",url:d.video.no_watermark,color:"var(--accent)"});
+    if(d.video&&d.video.hd)links.push({label:"Video Full HD",url:d.video.hd,color:"var(--accent)"});
+    if(d.audio&&d.audio.url)links.push({label:"Audio MP3",url:d.audio.url,color:"var(--success)"});
+
+    if(links.length===0){
+      html+='<div class="err" style="margin-top:8px">Tidak ada link download — provider mungkin tidak support video ini.</div>';
+    } else {
+      links.forEach(function(l){
+        html+='<div style="margin-top:10px"><span class="key">'+l.label+':</span><br><a href="'+l.url+'" target="_blank" rel="noopener" style="color:'+l.color+';word-break:break-all;font-size:11px">'+l.url+'</a></div>';
+      });
     }
 
     out("tiktok-output",html);
@@ -120,20 +125,24 @@ function tiktokAudio(){
 document.addEventListener("DOMContentLoaded",function(){
   if(typeof applyIcons==="function")applyIcons();
   initTheme();
-  document.getElementById("theme-toggle").addEventListener("click",function(){toggleTheme()});
+  var tt=document.getElementById("theme-toggle");
+  if(tt)tt.addEventListener("click",function(){toggleTheme()});
   document.querySelectorAll(".nav button").forEach(function(btn){btn.addEventListener("click",function(){switchTool(btn.dataset.tool)})});
   var last=localStorage.getItem("lastTool")||"hash";
   switchTool(last);
-  document.getElementById("search").addEventListener("input",function(e){filterTools(e.target.value)});
+  var s=document.getElementById("search");
+  if(s)s.addEventListener("input",function(e){filterTools(e.target.value)});
   var sidebar=document.getElementById("sidebar");
   var overlay=document.getElementById("overlay");
-  document.getElementById("menu-btn").addEventListener("click",function(){sidebar.classList.add("open");overlay.classList.add("show")});
-  overlay.addEventListener("click",function(){sidebar.classList.remove("open");overlay.classList.remove("show")});
-  document.getElementById("copy-all").addEventListener("click",function(){var active=document.querySelector(".tool.active .output");if(active&&active.textContent.trim())copyText(active.textContent.trim());else toast("Tidak ada output","error")});
+  var mb=document.getElementById("menu-btn");
+  if(mb)mb.addEventListener("click",function(){sidebar.classList.add("open");overlay.classList.add("show")});
+  if(overlay)overlay.addEventListener("click",function(){sidebar.classList.remove("open");overlay.classList.remove("show")});
+  var ca=document.getElementById("copy-all");
+  if(ca)ca.addEventListener("click",function(){var active=document.querySelector(".tool.active .output");if(active&&active.textContent.trim())copyText(active.textContent.trim());else toast("Tidak ada output","error")});
   document.querySelectorAll(".output[data-copyable]").forEach(function(el){el.addEventListener("click",function(){if(el.textContent.trim())copyText(el.textContent.trim())})});
   document.querySelectorAll("[data-persist]").forEach(function(el){var key="persist_"+el.id;var saved=localStorage.getItem(key);if(saved&&!el.value)el.value=saved;el.addEventListener("input",function(){localStorage.setItem(key,el.value)})});
   ["pw-len","pw-upper","pw-lower","pw-digit","pw-sym"].forEach(function(id){var el=document.getElementById(id);if(el)el.addEventListener("input",updateStrength)});
   updateStrength();
-  document.addEventListener("keydown",function(e){if((e.ctrlKey||e.metaKey)&&e.key==="k"){e.preventDefault();document.getElementById("search").focus()}});
+  document.addEventListener("keydown",function(e){if((e.ctrlKey||e.metaKey)&&e.key==="k"){e.preventDefault();if(s)s.focus()}});
   timeNow();convertColor();genQR();
 });
