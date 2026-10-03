@@ -3,7 +3,7 @@ let toastTimer;
 function toast(msg,type){type=type||"info";var el=document.getElementById("toast");el.textContent=msg;el.className="toast show "+type;clearTimeout(toastTimer);toastTimer=setTimeout(function(){el.classList.remove("show")},2000)}
 async function copyText(text){try{await navigator.clipboard.writeText(text);toast("Copied","success")}catch(e){var ta=document.createElement("textarea");ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand("copy");document.body.removeChild(ta);toast("Copied","success")}}
 function initTheme(){var saved=localStorage.getItem("theme")||"dark";document.documentElement.setAttribute("data-theme",saved);var icon=document.getElementById("theme-icon");if(icon)icon.setAttribute("data-icon",saved==="dark"?"moon":"sun")}
-function toggleTheme(){var cur=document.documentElement.getAttribute("data-theme");var next=cur==="dark"?"light":"dark";document.documentElement.setAttribute("data-theme",next);localStorage.setItem("theme",next);var icon=document.getElementById("theme-icon");if(icon)icon.setAttribute("data-icon",next==="dark"?"moon":"sun");applyIcons()}
+function toggleTheme(){var cur=document.documentElement.getAttribute("data-theme");var next=cur==="dark"?"light":"dark";document.documentElement.setAttribute("data-theme",next);localStorage.setItem("theme",next);var icon=document.getElementById("theme-icon");if(icon)icon.setAttribute("data-icon",next==="dark"?"moon":"sun");if(typeof applyIcons==="function")applyIcons()}
 function switchTool(tool){document.querySelectorAll('.nav button').forEach(function(b){b.classList.toggle("active",b.dataset.tool===tool)});document.querySelectorAll(".tool").forEach(function(t){t.classList.remove("active")});var target=document.getElementById("tool-"+tool);if(target)target.classList.add("active");document.getElementById("current-tool-title").textContent=TOOL_TITLES[tool]||tool;localStorage.setItem("lastTool",tool);document.getElementById("sidebar").classList.remove("open");document.getElementById("overlay").classList.remove("show")}
 function filterTools(q){var nav=document.getElementById("nav");var buttons=nav.querySelectorAll("button");var visible=0;q=q.toLowerCase().trim();buttons.forEach(function(btn){var name=TOOL_TITLES[btn.dataset.tool].toLowerCase();var match=!q||name.includes(q);btn.style.display=match?"":"none";if(match)visible++});var empty=nav.querySelector(".nav-empty");if(visible===0){if(!empty){empty=document.createElement("div");empty.className="nav-empty";empty.textContent="Tidak ada tool cocok";nav.appendChild(empty)}}else if(empty)empty.remove()}
 function out(id,html){document.getElementById(id).innerHTML=html}
@@ -34,8 +34,107 @@ function textStats(){var t=document.getElementById("text-input").value;var words
 function textCase(mode){var t=document.getElementById("text-input").value;var map={upper:t.toUpperCase(),lower:t.toLowerCase(),title:t.replace(/\w\S*/g,function(w){return w[0].toUpperCase()+w.slice(1).toLowerCase()}),reverse:t.split("").reverse().join(""),slug:t.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")};out("text-output",esc(map[mode]))}
 function timeNow(){var now=new Date();var html=kv("unix (s)",Math.floor(now.getTime()/1000))+kv("unix (ms)",now.getTime())+kv("ISO",now.toISOString())+kv("local",now.toLocaleString())+kv("UTC",now.toUTCString());out("time-output",html)}
 function timeParse(){var v=document.getElementById("time-input").value.trim()||Date.now();var d=new Date(/^\d+$/.test(v)?(+v<1e12?+v*1000:+v):v);if(isNaN(d))return out("time-output",'<span class="err">format tidak valid</span>');var html=kv("ISO",d.toISOString())+kv("local",d.toLocaleString())+kv("UTC",d.toUTCString())+kv("unix",Math.floor(d.getTime()/1000));out("time-output",html)}
-function extractTikTokId(url){var m=url.match(/\/video\/(\d+)/)||url.match(/\/v\/(\d+)/);return m?m[1]:null}
-async function tiktokFetch(){var url=document.getElementById("tiktok-input").value.trim();if(!url)return toast("Paste URL TikTok dulu","error");if(!extractTikTokId(url))return toast("URL TikTok tidak valid","error");out("tiktok-output",'<span class="dim">Mengambil data...</span>');try{var apiUrl="https://www.tikwm.com/api/?url="+encodeURIComponent(url)+"&hd=1";var r=await fetch(apiUrl);var d=await r.json();if(d.code!==0||!d.data)return out("tiktok-output",'<span class="err">Gagal: '+(d.msg||"tidak dapat data")+'</span>');var v=d.data;var html="";if(v.cover)out("tiktok-preview",'<img src="'+v.cover+'" style="max-width:280px;border-radius:10px">');html+=kv("title",(v.title||"").slice(0,100));html+=kv("author","@"+(v.author&&v.author.unique_id?v.author.unique_id:"?"));html+=kv("duration",(v.duration||0)+"s");html+=kv("plays",(v.play_count||0).toLocaleString());html+=kv("likes",(v.digg_count||0).toLocaleString());if(v.play)html+='<div style="margin-top:12px"><span class="key">video (no watermark):</span></div><div><a href="'+v.play+'" target="_blank" style="color:var(--accent);word-break:break-all">'+v.play+'</a></div>';if(v.music)html+='<div style="margin-top:6px"><span class="key">audio:</span></div><div><a href="'+v.music+'" target="_blank" style="color:var(--success);word-break:break-all">'+v.music+'</a></div>';out("tiktok-output",html);window._tiktokData=v;toast("Data diambil","success")}catch(e){out("tiktok-output",'<span class="err">Error: '+e.message+'</span>')}}
-function tiktokDownload(){var v=window._tiktokData;if(!v||!v.play)return toast("Klik Ambil Info dulu","error");window.open(v.play,"_blank");toast("Membuka video","success")}
-function tiktokAudio(){var v=window._tiktokData;if(!v||!v.music)return toast("Klik Ambil Info dulu","error");window.open(v.music,"_blank");toast("Membuka audio","success")}
-document.addEventListener("DOMContentLoaded",function(){if(typeof applyIcons==="function")applyIcons();initTheme();document.getElementById("theme-toggle").addEventListener("click",function(){toggleTheme()});document.querySelectorAll(".nav button").forEach(function(btn){btn.addEventListener("click",function(){switchTool(btn.dataset.tool)})});var last=localStorage.getItem("lastTool")||"hash";switchTool(last);document.getElementById("search").addEventListener("input",function(e){filterTools(e.target.value)});var sidebar=document.getElementById("sidebar");var overlay=document.getElementById("overlay");document.getElementById("menu-btn").addEventListener("click",function(){sidebar.classList.add("open");overlay.classList.add("show")});overlay.addEventListener("click",function(){sidebar.classList.remove("open");overlay.classList.remove("show")});document.getElementById("copy-all").addEventListener("click",function(){var active=document.querySelector(".tool.active .output");if(active&&active.textContent.trim())copyText(active.textContent.trim());else toast("Tidak ada output","error")});document.querySelectorAll(".output[data-copyable]").forEach(function(el){el.addEventListener("click",function(){if(el.textContent.trim())copyText(el.textContent.trim())})});document.querySelectorAll("[data-persist]").forEach(function(el){var key="persist_"+el.id;var saved=localStorage.getItem(key);if(saved&&!el.value)el.value=saved;el.addEventListener("input",function(){localStorage.setItem(key,el.value)})});["pw-len","pw-upper","pw-lower","pw-digit","pw-sym"].forEach(function(id){var el=document.getElementById(id);if(el)el.addEventListener("input",updateStrength)});updateStrength();document.addEventListener("keydown",function(e){if((e.ctrlKey||e.metaKey)&&e.key==="k"){e.preventDefault();document.getElementById("search").focus()}});timeNow();convertColor();genQR()});
+
+// ─── TIKTOK (via Cloudflare Function) ───
+async function tiktokFetch(){
+  var url=document.getElementById("tiktok-input").value.trim();
+  if(!url)return toast("Paste URL TikTok dulu","error");
+
+  // validasi basic — hanya cek apakah mengandung tiktok.com
+  if(!/tiktok\.com|douyin\.com/i.test(url)){
+    return toast("URL bukan dari TikTok","error");
+  }
+
+  out("tiktok-output",'<span class="dim">Mengambil data...</span>');
+  out("tiktok-preview","");
+
+  try{
+    var apiUrl="/api/tiktok?url="+encodeURIComponent(url)+"&hd=1";
+    var r=await fetch(apiUrl);
+    var d=await r.json();
+
+    if(!d.ok){
+      return out("tiktok-output",'<span class="err">Gagal: '+(d.error||"tidak dapat data")+'</span>');
+    }
+
+    window._tiktokData=d;
+
+    var html="";
+    if(d.id)html+=kv("ID",d.id);
+    if(d.title)html+=kv("title",(d.title||"").slice(0,100));
+    if(d.author&&d.author.id)html+=kv("author","@"+d.author.id+(d.author.nickname?" ("+d.author.nickname+")":""));
+    if(d.duration)html+=kv("duration",d.duration+"s");
+    if(d.stats){
+      if(d.stats.plays)html+=kv("plays",d.stats.plays.toLocaleString());
+      if(d.stats.likes)html+=kv("likes",d.stats.likes.toLocaleString());
+      if(d.stats.comments)html+=kv("comments",d.stats.comments.toLocaleString());
+      if(d.stats.shares)html+=kv("shares",d.stats.shares.toLocaleString());
+    }
+    if(d.audio&&d.audio.title)html+=kv("music",d.audio.title+(d.audio.author?" - "+d.audio.author:""));
+    if(d.provider)html+=kv("provider",d.provider);
+
+    html+='<div style="margin-top:14px;padding:12px;background:var(--bg-3);border-radius:8px"><span class="key" style="font-size:14px">DOWNLOAD LINK</span></div>';
+
+    if(d.video&&d.video.no_watermark){
+      html+='<div style="margin-top:8px"><span class="key">Video HD (no watermark):</span><br><a href="'+d.video.no_watermark+'" target="_blank" rel="noopener" style="color:var(--accent);word-break:break-all;font-size:12px">'+d.video.no_watermark+'</a></div>';
+    }
+    if(d.video&&d.video.hd){
+      html+='<div style="margin-top:8px"><span class="key">Video Full HD:</span><br><a href="'+d.video.hd+'" target="_blank" rel="noopener" style="color:var(--accent);word-break:break-all;font-size:12px">'+d.video.hd+'</a></div>';
+    }
+    if(d.audio&&d.audio.url){
+      html+='<div style="margin-top:8px"><span class="key">Audio MP3:</span><br><a href="'+d.audio.url+'" target="_blank" rel="noopener" style="color:var(--success);word-break:break-all;font-size:12px">'+d.audio.url+'</a></div>';
+    }
+
+    out("tiktok-output",html);
+
+    if(d.cover){
+      out("tiktok-preview",'<img src="'+d.cover+'" style="max-width:280px;border-radius:10px" onerror="this.style.display=\'none\'">');
+    }
+
+    toast("Data diambil","success");
+  }catch(e){
+    out("tiktok-output",'<span class="err">Error: '+e.message+'</span>');
+  }
+}
+
+function tiktokDownload(){
+  var v=window._tiktokData;
+  if(!v||!v.video){
+    return toast("Klik Ambil Info dulu","error");
+  }
+  var link=v.video.no_watermark||v.video.hd||v.video.watermark;
+  if(!link)return toast("Link tidak tersedia","error");
+  window.open(link,"_blank");
+  toast("Membuka video","success");
+}
+
+function tiktokAudio(){
+  var v=window._tiktokData;
+  if(!v||!v.audio||!v.audio.url){
+    return toast("Klik Ambil Info dulu","error");
+  }
+  window.open(v.audio.url,"_blank");
+  toast("Membuka audio","success");
+}
+
+// ─── INIT ───
+document.addEventListener("DOMContentLoaded",function(){
+  if(typeof applyIcons==="function")applyIcons();
+  initTheme();
+  document.getElementById("theme-toggle").addEventListener("click",function(){toggleTheme()});
+  document.querySelectorAll(".nav button").forEach(function(btn){btn.addEventListener("click",function(){switchTool(btn.dataset.tool)})});
+  var last=localStorage.getItem("lastTool")||"hash";
+  switchTool(last);
+  document.getElementById("search").addEventListener("input",function(e){filterTools(e.target.value)});
+  var sidebar=document.getElementById("sidebar");
+  var overlay=document.getElementById("overlay");
+  document.getElementById("menu-btn").addEventListener("click",function(){sidebar.classList.add("open");overlay.classList.add("show")});
+  overlay.addEventListener("click",function(){sidebar.classList.remove("open");overlay.classList.remove("show")});
+  document.getElementById("copy-all").addEventListener("click",function(){var active=document.querySelector(".tool.active .output");if(active&&active.textContent.trim())copyText(active.textContent.trim());else toast("Tidak ada output","error")});
+  document.querySelectorAll(".output[data-copyable]").forEach(function(el){el.addEventListener("click",function(){if(el.textContent.trim())copyText(el.textContent.trim())})});
+  document.querySelectorAll("[data-persist]").forEach(function(el){var key="persist_"+el.id;var saved=localStorage.getItem(key);if(saved&&!el.value)el.value=saved;el.addEventListener("input",function(){localStorage.setItem(key,el.value)})});
+  ["pw-len","pw-upper","pw-lower","pw-digit","pw-sym"].forEach(function(id){var el=document.getElementById(id);if(el)el.addEventListener("input",updateStrength)});
+  updateStrength();
+  document.addEventListener("keydown",function(e){if((e.ctrlKey||e.metaKey)&&e.key==="k"){e.preventDefault();document.getElementById("search").focus()}});
+  timeNow();convertColor();genQR();
+});

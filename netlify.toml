@@ -7,3 +7,15 @@
   functions = "netlify/functions"
   port = 8888
   edgeFunctions = false
+
+# Redirect: /api/tiktok → /.netlify/functions/tiktok
+[[redirects]]
+  from = "/api/tiktok"
+  to = "/.netlify/functions/tiktok"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
