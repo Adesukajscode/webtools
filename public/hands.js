@@ -40,20 +40,36 @@ async function checkPerm(){
 }
 
 async function startCam(v){
-  // coba bertingkat — dari constraint paling ideal ke paling longgar
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    throw new Error("Browser tidak support kamera. Pakai Chrome/Firefox terbaru.")
+  }
+  // coba 4 tingkat constraint
   const attempts=[
     {video:{facingMode:"user",width:{ideal:640},height:{ideal:480}},audio:!1},
     {video:{facingMode:"user"},audio:!1},
+    {video:{width:640,height:480},audio:!1},
     {video:!0,audio:!1},
   ];
   let lastErr;
-  for(const c of attempts){
+  for(let i=0;i<attempts.length;i++){
     try{
-      stream=await navigator.mediaDevices.getUserMedia(c);
+      stream=await navigator.mediaDevices.getUserMedia(attempts[i]);
       v.srcObject=stream;
-      await v.play();
+      v.setAttribute("playsinline","true");
+      v.muted=!0;
+      await v.play().catch(()=>{});
+      // tunggu video benar-benar ready
+      await new Promise(r=>{
+        if(v.readyState>=2)return r();
+        v.onloadedmetadata=()=>r();
+        setTimeout(r,1500);
+      });
+      console.log("[hands] camera OK attempt",i+1);
       return!0
-    }catch(e){lastErr=e}
+    }catch(e){
+      lastErr=e;
+      console.warn("[hands] attempt",i+1,"failed:",e.name,e.message)
+    }
   }
   throw lastErr||new Error("Kamera tidak bisa diakses")
 }

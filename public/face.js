@@ -48,18 +48,40 @@ function euclid(a,b){
 
 // ═══ CAMERA ═══
 async function startCamera(video){
-  try{
-    stream=await navigator.mediaDevices.getUserMedia({
-      video:{facingMode:"user",width:{ideal:640},height:{ideal:480}},
-      audio:!1
-    });
-    video.srcObject=stream;
-    await video.play();
-    return!0
-  }catch(e){
-    toast("Akses kamera ditolak: "+e.message,"error");
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    toast("Browser tidak support kamera","error");
     return!1
   }
+  const attempts=[
+    {video:{facingMode:"user",width:{ideal:640},height:{ideal:480}},audio:!1},
+    {video:{facingMode:"user"},audio:!1},
+    {video:!0,audio:!1},
+  ];
+  let lastErr;
+  for(const c of attempts){
+    try{
+      stream=await navigator.mediaDevices.getUserMedia(c);
+      video.srcObject=stream;
+      video.setAttribute("playsinline","true");
+      video.muted=!0;
+      await video.play().catch(()=>{});
+      await new Promise(r=>{
+        if(video.readyState>=2)return r();
+        video.onloadedmetadata=()=>r();
+        setTimeout(r,1500);
+      });
+      console.log("[face] camera OK");
+      return!0
+    }catch(e){lastErr=e;console.warn("[face] attempt failed:",e.name)}
+  }
+  const msg={
+    "NotAllowedError":"Izin kamera ditolak. Buka Settings browser → izinkan kamera untuk domain ini.",
+    "NotFoundError":"Tidak ada kamera di device ini.",
+    "NotReadableError":"Kamera dipakai app lain. Tutup dulu, coba lagi.",
+    "SecurityError":"Halaman harus HTTPS."
+  }[lastErr?.name]||("Kamera gagal: "+(lastErr?.message||"unknown"));
+  toast(msg,"error");
+  return!1
 }
 function stopCamera(video){
   running=!1;
