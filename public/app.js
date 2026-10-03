@@ -1,6 +1,6 @@
 const TOOL_TITLES = {hash:"Hash Generator",base64:"Base64 Encoder/Decoder",url:"URL Encoder/Decoder",hex:"Hex Encoder/Decoder",jwt:"JWT Decoder",uuid:"UUID Generator",password:"Password Generator",qr:"QR Code Generator",json:"JSON Formatter",regex:"Regex Tester",color:"Color Converter",cron:"Cron Parser",ip:"IP Lookup",text:"Text Utilities",time:"Timestamp",tiktok:"TikTok Downloader"};
 let toastTimer;
-function toast(msg,type){type=type||"info";var el=document.getElementById("toast");el.textContent=msg;el.className="toast show "+type;clearTimeout(toastTimer);toastTimer=setTimeout(function(){el.classList.remove("show")},2000)}
+function toast(msg,type){type=type||"info";var el=document.getElementById("toast");el.textContent=msg;el.className="toast show "+type;clearTimeout(toastTimer);toastTimer=setTimeout(function(){el.classList.remove("show")},2500)}
 async function copyText(text){try{await navigator.clipboard.writeText(text);toast("Copied","success")}catch(e){var ta=document.createElement("textarea");ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand("copy");document.body.removeChild(ta);toast("Copied","success")}}
 function initTheme(){var saved=localStorage.getItem("theme")||"dark";document.documentElement.setAttribute("data-theme",saved);var icon=document.getElementById("theme-icon");if(icon)icon.setAttribute("data-icon",saved==="dark"?"moon":"sun")}
 function toggleTheme(){var cur=document.documentElement.getAttribute("data-theme");var next=cur==="dark"?"light":"dark";document.documentElement.setAttribute("data-theme",next);localStorage.setItem("theme",next);var icon=document.getElementById("theme-icon");if(icon)icon.setAttribute("data-icon",next==="dark"?"moon":"sun");if(typeof applyIcons==="function")applyIcons()}
@@ -39,11 +39,7 @@ function timeParse(){var v=document.getElementById("time-input").value.trim()||D
 async function tiktokFetch(){
   var url=document.getElementById("tiktok-input").value.trim();
   if(!url)return toast("Paste URL TikTok dulu","error");
-
-  // validasi basic — hanya cek apakah mengandung tiktok.com
-  if(!/tiktok\.com|douyin\.com/i.test(url)){
-    return toast("URL bukan dari TikTok","error");
-  }
+  if(!/tiktok\.com|douyin\.com/i.test(url))return toast("URL bukan dari TikTok","error");
 
   out("tiktok-output",'<span class="dim">Mengambil data...</span>');
   out("tiktok-preview","");
@@ -51,6 +47,13 @@ async function tiktokFetch(){
   try{
     var apiUrl="/api/tiktok?url="+encodeURIComponent(url)+"&hd=1";
     var r=await fetch(apiUrl);
+
+    // cek dulu apakah respons JSON
+    var ct=r.headers.get("content-type")||"";
+    if(!ct.includes("json")){
+      return out("tiktok-output",'<span class="err">Server return non-JSON ('+r.status+'). Cek function /api/tiktok sudah deploy atau belum.</span>');
+    }
+
     var d=await r.json();
 
     if(!d.ok){
@@ -99,9 +102,7 @@ async function tiktokFetch(){
 
 function tiktokDownload(){
   var v=window._tiktokData;
-  if(!v||!v.video){
-    return toast("Klik Ambil Info dulu","error");
-  }
+  if(!v||!v.video)return toast("Klik Ambil Info dulu","error");
   var link=v.video.no_watermark||v.video.hd||v.video.watermark;
   if(!link)return toast("Link tidak tersedia","error");
   window.open(link,"_blank");
@@ -110,9 +111,7 @@ function tiktokDownload(){
 
 function tiktokAudio(){
   var v=window._tiktokData;
-  if(!v||!v.audio||!v.audio.url){
-    return toast("Klik Ambil Info dulu","error");
-  }
+  if(!v||!v.audio||!v.audio.url)return toast("Klik Ambil Info dulu","error");
   window.open(v.audio.url,"_blank");
   toast("Membuka audio","success");
 }
