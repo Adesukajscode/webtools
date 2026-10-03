@@ -1733,3 +1733,51 @@ html.auth-active { overflow: hidden; }
   font-weight: 600;
   text-decoration: underline;
 }
+/* ═══ TODO ═══ */
+.todo-item{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--bg-2);border:1.5px solid var(--border);border-radius:12px;margin-bottom:8px;transition:all .25s var(--ease);animation:slideIn .3s var(--ease-out)}
+.todo-item:hover{border-color:var(--accent);transform:translateX(4px)}
+.todo-item.done{opacity:.5}
+.todo-item.done .todo-text{text-decoration:line-through;color:var(--text-dim)}
+.todo-item input[type=checkbox]{width:20px;height:20px;accent-color:var(--accent);cursor:pointer;transform:scale(1.2)}
+.todo-text{flex:1;font-size:14px}
+.todo-del{background:transparent;border:none;color:var(--text-dimmer);font-size:16px;cursor:pointer;padding:4px 8px;border-radius:6px;transition:all .2s}
+.todo-del:hover{background:rgba(255,45,85,.1);color:var(--accent-2)}
+/* ═══ STOPWATCH ═══ */
+.sw-display{font-family:'JetBrains Mono',monospace;font-size:52px;font-weight:700;text-align:center;padding:32px 16px;background:linear-gradient(135deg,var(--bg-2),var(--bg-3));border:1.5px solid var(--border);border-radius:20px;color:var(--accent);text-shadow:0 0 24px rgba(22,163,74,.4);letter-spacing:2px;margin-bottom:16px;font-variant-numeric:tabular-nums}
+.sw-lap{display:flex;justify-content:space-between;padding:10px 16px;background:var(--bg-2);border:1px solid var(--border);border-radius:10px;margin-bottom:6px;font-family:'JetBrains Mono',monospace;font-size:13px;animation:slideIn .3s var(--ease-out)}
+/* ═══ WORLD CLOCK ═══ */
+.clk-item{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:16px;padding:16px 20px;background:var(--bg-2);border:1.5px solid var(--border);border-radius:14px;margin-bottom:8px;transition:all .3s var(--ease)}
+.clk-item:hover{border-color:var(--accent);transform:translateX(4px);box-shadow:var(--shadow-glow)}
+.clk-city{font-weight:600;font-size:14px}
+.clk-time{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums}
+.clk-date{font-size:11px;color:var(--text-dim);text-align:right}
+/* ═══ MARKDOWN ═══ */
+.md-preview{min-height:200px;line-height:1.7}
+.md-preview h1{font-size:26px;margin:16px 0 8px;color:var(--accent)}
+.md-preview h2{font-size:20px;margin:14px 0 6px;color:var(--accent-3)}
+.md-preview h3{font-size:16px;margin:12px 0 6px;color:var(--text)}
+.md-preview p{margin:8px 0}
+.md-preview ul{margin:8px 0 8px 20px}
+.md-preview li{margin:4px 0}
+.md-preview code{background:var(--bg-3);padding:2px 6px;border-radius:4px;font-size:12px;color:var(--accent-4)}
+.md-preview strong{color:var(--text);font-weight:700}
+.md-preview em{color:var(--text-dim);font-style:italic}
+/* ═══ SELECT + DATE ═══ */
+select,input[type=date]{width:100%;padding:12px 16px;background:var(--bg-2);border:1.5px solid var(--border);border-radius:10px;color:var(--text);font-family:inherit;font-size:13px;margin-bottom:12px;cursor:pointer;transition:all .25s var(--ease)}
+select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a8aa8' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:40px}
+select:focus,input[type=date]:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(22,163,74,.12)}
+select option{background:var(--bg-2);color:var(--text)}
+/* ═══ UI UPGRADE ═══ */
+.tool-head::after{content:"";position:absolute;bottom:-1px;left:0;width:0;height:3px;background:linear-gradient(90deg,var(--accent),var(--accent-3));border-radius:3px;animation:expandLine .8s var(--ease-out) forwards}
+@keyframes expandLine{from{width:0}to{width:80px}}
+.nav button:hover .nav-icon{animation:iconWiggle .5s var(--ease)}
+@keyframes iconWiggle{0%,100%{transform:rotate(0)}25%{transform:rotate(-8deg) scale(1.1)}75%{transform:rotate(8deg) scale(1.1)}}
+.output:not(:empty){animation:outputSlide .4s var(--ease-out)}
+@keyframes outputSlide{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes slideIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
+.btn.primary:hover{animation:btnPulse 1.5s infinite}
+@keyframes btnPulse{0%,100%{box-shadow:0 8px 24px rgba(22,163,74,.4)}50%{box-shadow:0 8px 32px rgba(22,163,74,.6),0 0 48px rgba(14,165,233,.3)}}
+.row>input,.row>select{margin-bottom:0}
+body::before{content:"";position:fixed;inset:0;background:radial-gradient(circle at 20% 30%,rgba(22,163,74,.05),transparent 40%),radial-gradient(circle at 80% 70%,rgba(14,165,233,.05),transparent 40%);pointer-events:none;z-index:-1;animation:bgBreath 8s ease-in-out infinite}
+@keyframes bgBreath{0%,100%{opacity:.5}50%{opacity:1}}
+@media(max-width:480px){.sw-display{font-size:36px;padding:24px 12px}.clk-item{grid-template-columns:1fr auto;gap:8px;padding:12px 14px}.clk-date{grid-column:1/-1;text-align:left;font-size:10px}.clk-time{font-size:18px}}
