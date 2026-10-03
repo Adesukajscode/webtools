@@ -1,0 +1,10 @@
+{
+  "name": "cybertoolbox",
+  "version": "1.0.0",
+  "description": "15 web tools in one place",
+  "scripts": {
+    "dev": "netlify dev",
+    "deploy": "netlify deploy --prod"
+  },
+  "dependencies": {}
+}
