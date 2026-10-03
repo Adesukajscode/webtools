@@ -9,7 +9,8 @@ const TOOL_TITLES = {
   password: "Password Generator", qr: "QR Code Generator",
   json: "JSON Formatter", regex: "Regex Tester",
   color: "Color Converter", cron: "Cron Parser",
-  ip: "IP Lookup", text: "Text Utilities", time: "Timestamp"
+  ip: "IP Lookup", text: "Text Utilities", time: "Timestamp",
+  tiktok: "TikTok Downloader"
 };
 
 // ─── TOAST ───
@@ -492,4 +493,90 @@ document.addEventListener("DOMContentLoaded", () => {
 // register service worker for PWA
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").catch(() => { });
+}
+
+// ═══════════════════════════════════════════════════
+// TIKTOK DOWNLOADER (v3)
+// ═══════════════════════════════════════════════════
+
+function extractTikTokId(url) {
+  const m = url.match(/\/video\/(\d+)/) || url.match(/\/v\/(\d+)/);
+  return m ? m[1] : null;
+}
+
+async function tiktokFetch() {
+  const url = document.getElementById("tiktok-input").value.trim();
+  if (!url) return toast("Paste URL TikTok dulu", "error");
+
+  const id = extractTikTokId(url);
+  if (!id) return toast("URL TikTok tidak valid", "error");
+
+  out("tiktok-output", '<span class="dim">⏳ Mengambil data...</span>');
+
+  try {
+    // Pakai tikwm.com API (public, no key)
+    const apiUrl = `https://www.tikwm.com/api/?url=${encodeURIComponent(url)}&hd=1`;
+    const r = await fetch(apiUrl);
+    const d = await r.json();
+
+    if (d.code !== 0 || !d.data) {
+      return out("tiktok-output", `<span class="err">Gagal: ${d.msg || "tidak dapat data"}</span>`);
+    }
+
+    const v = d.data;
+    let html = "";
+
+    // thumbnail preview
+    if (v.cover) {
+      out("tiktok-preview",
+        `<img src="${v.cover}" alt="thumbnail" style="max-width:280px;border-radius:10px" onerror="this.style.display='none'">`);
+    }
+
+    html += kv("title", (v.title || "").slice(0, 100));
+    html += kv("author", "@" + (v.author?.unique_id || "?"));
+    html += kv("nickname", v.author?.nickname || "?");
+    html += kv("duration", (v.duration || 0) + "s");
+    html += kv("plays", (v.play_count || 0).toLocaleString());
+    html += kv("likes", (v.digg_count || 0).toLocaleString());
+    html += kv("comments", (v.comment_count || 0).toLocaleString());
+    html += kv("shares", (v.share_count || 0).toLocaleString());
+    html += kv("music", v.music_info?.title || "?");
+
+    if (v.play) {
+      html += `<div style="margin-top:12px"><span class="key">video (no watermark):</span></div>`;
+      html += `<div><a href="${v.play}" target="_blank" style="color:var(--accent);word-break:break-all">${v.play}</a></div>`;
+    }
+    if (v.wmplay) {
+      html += `<div style="margin-top:6px"><span class="key">video (watermark):</span></div>`;
+      html += `<div><a href="${v.wmplay}" target="_blank" style="color:var(--text-dim);word-break:break-all">${v.wmplay}</a></div>`;
+    }
+    if (v.music) {
+      html += `<div style="margin-top:6px"><span class="key">audio:</span></div>`;
+      html += `<div><a href="${v.music}" target="_blank" style="color:var(--success);word-break:break-all">${v.music}</a></div>`;
+    }
+
+    out("tiktok-output", html);
+
+    // simpan URL untuk download
+    window._tiktokData = v;
+
+    toast("✅ Data berhasil diambil", "success");
+  } catch (e) {
+    out("tiktok-output", `<span class="err">Error: ${e.message}</span>`);
+  }
+}
+
+function tiktokDownload() {
+  const v = window._tiktokData;
+  if (!v || !v.play) return toast("Klik 'Ambil Info' dulu", "error");
+  // langsung buka URL video di tab baru untuk download
+  window.open(v.play, "_blank");
+  toast("📥 Membuka video...", "success");
+}
+
+function tiktokAudio() {
+  const v = window._tiktokData;
+  if (!v || !v.music) return toast("Klik 'Ambil Info' dulu", "error");
+  window.open(v.music, "_blank");
+  toast("🎵 Membuka audio...", "success");
 }

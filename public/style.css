@@ -499,3 +499,54 @@ mark.hl {
   color: var(--text-dimmer);
   font-size: 12px;
 }
+
+/* ─── SVG ICONS ─── */
+.brand-icon,
+.nav-icon,
+.search-icon,
+.theme-btn span,
+#menu-btn span,
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.brand-icon svg,
+.nav-icon svg,
+.search-icon svg,
+.theme-btn svg,
+#menu-btn svg,
+.icon-btn svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  transition: transform 0.2s;
+}
+.brand-icon svg {
+  width: 24px;
+  height: 24px;
+  stroke: var(--accent);
+  filter: drop-shadow(0 0 6px var(--accent));
+}
+.nav-icon svg {
+  width: 16px;
+  height: 16px;
+}
+.nav button:hover .nav-icon svg {
+  transform: scale(1.1);
+}
+.search-icon {
+  position: absolute;
+  left: 22px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--text-dim);
+}
+.search-icon svg {
+  width: 14px;
+  height: 14px;
+}
+.search-wrap input {
+  padding-left: 38px !important;
+}
