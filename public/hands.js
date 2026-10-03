@@ -31,11 +31,43 @@ async function loadModel(){
 }
 
 // ═══ CAMERA ═══
+async function checkPerm(){
+  try{
+    if(!navigator.permissions||!navigator.permissions.query)return"unknown";
+    const r=await navigator.permissions.query({name:"camera"});
+    return r.state
+  }catch(e){return"unknown"}
+}
+
 async function startCam(v){
-  stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"user",width:{ideal:640},height:{ideal:480}},audio:!1});
-  v.srcObject=stream;
-  await v.play();
-  return!0
+  // coba bertingkat — dari constraint paling ideal ke paling longgar
+  const attempts=[
+    {video:{facingMode:"user",width:{ideal:640},height:{ideal:480}},audio:!1},
+    {video:{facingMode:"user"},audio:!1},
+    {video:!0,audio:!1},
+  ];
+  let lastErr;
+  for(const c of attempts){
+    try{
+      stream=await navigator.mediaDevices.getUserMedia(c);
+      v.srcObject=stream;
+      await v.play();
+      return!0
+    }catch(e){lastErr=e}
+  }
+  throw lastErr||new Error("Kamera tidak bisa diakses")
+}
+
+function getPermHelp(errName){
+  const help={
+    "NotAllowedError":"Izin ditolak. Buka Settings browser → Site settings → Camera → Allow untuk webtools-vex.pages.dev, lalu refresh halaman.",
+    "NotFoundError":"Tidak ada kamera terdeteksi di device ini.",
+    "NotReadableError":"Kamera sedang dipakai aplikasi lain. Tutup app kamera/WhatsApp video call, coba lagi.",
+    "OverconstrainedError":"Kamera tidak support resolusi yang diminta.",
+    "SecurityError":"Halaman harus HTTPS. Buka via webtools-vex.pages.dev (bukan http).",
+    "AbortError":"Kamera dihentikan. Coba lagi."
+  };
+  return help[errName]||"Error: "+errName
 }
 function stopCam(v){
   running=!1;
@@ -265,10 +297,21 @@ function bind(){
   $("hd-trail").addEventListener("change",e=>trailOn=e.target.checked);
 
   bStart.addEventListener("click",async()=>{
-    bStart.disabled=!0;bStart.textContent="⏳ Loading model...";
+    bStart.disabled=!0;bStart.textContent="⏳ Cek izin...";
     try{
+      const perm=await checkPerm();
+      if(perm==="denied"){
+        bStart.disabled=!1;bStart.textContent="▶ Nyalakan Kamera";
+        status.textContent="🚫 Izin kamera ditolak permanen. Reset di Settings browser.";
+        status.className="hd-status hd-status-err";
+        showPermGuide();
+        toast("Izin ditolak. Lihat panduan reset.","error");
+        return
+      }
+      bStart.textContent="⏳ Loading model...";
       await loadModel();
-      const ok=await startCam(video).catch(e=>{throw new Error("Kamera: "+e.message)});
+      bStart.textContent="⏳ Minta izin kamera...";
+      const ok=await startCam(video);
       if(!ok)throw new Error("Kamera gagal");
       bStop.disabled=!1;bStart.textContent="▶ Kamera Aktif";
       status.textContent="Model siap · Deteksi aktif";
@@ -276,11 +319,42 @@ function bind(){
       loopFn(video,canvas,status,stats);
     }catch(e){
       bStart.disabled=!1;bStart.textContent="▶ Nyalakan Kamera";
-      status.textContent="Error: "+e.message;
+      const help=getPermHelp(e.name);
+      status.textContent=help;
       status.className="hd-status hd-status-err";
-      toast(e.message,"error");
+      if(e.name==="NotAllowedError")showPermGuide();
+      toast(help,"error");
     }
   });
+
+  function showPermGuide(){
+    let box=$("hd-perm-guide");
+    if(box){box.style.display="block";return}
+    box=document.createElement("div");
+    box.id="hd-perm-guide";
+    box.className="hd-perm-guide";
+    box.innerHTML=`
+      <div class="hd-perm-title">🚫 Izin Kamera Ditolak — Cara Reset</div>
+      <div class="hd-perm-body">
+        <div class="hd-perm-step"><b>1.</b> Buka <b>Chrome → ⋮ → Settings → Site settings → Camera</b></div>
+        <div class="hd-perm-step"><b>2.</b> Cari <code>webtools-vex.pages.dev</code> di daftar <b>"Blocked"</b></div>
+        <div class="hd-perm-step"><b>3.</b> Tap situs → <b>Clear & reset</b> atau pindah ke <b>"Allowed"</b></div>
+        <div class="hd-perm-step"><b>4.</b> Kembali ke sini → <b>Refresh halaman</b> (Ctrl+R / swipe down)</div>
+        <div class="hd-perm-step"><b>5.</b> Klik <b>Nyalakan Kamera</b> → izin muncul lagi → tap <b>Allow</b></div>
+        <div class="hd-perm-alt">
+          <b>Alternatif cepat:</b><br>
+          • Chrome: tap ikon 🔒 di address bar → <b>Permissions</b> → <b>Camera: Allow</b><br>
+          • Atau buka di <b>Incognito</b> (izin fresh, langsung diminta ulang)<br>
+          • Atau ganti browser (Firefox/Kiwi/Brave)
+        </div>
+      </div>
+      <button class="btn" id="hd-perm-close">Mengerti</button>
+    `;
+    const anchor=document.querySelector("#tool-hands .row");
+    if(anchor&&anchor.parentNode)anchor.parentNode.insertBefore(box,anchor.nextSibling);
+    else if($("tool-hands"))$("tool-hands").appendChild(box);
+    $("hd-perm-close").addEventListener("click",()=>box.style.display="none");
+  }
 
   bStop.addEventListener("click",()=>{
     stopCam(video);
