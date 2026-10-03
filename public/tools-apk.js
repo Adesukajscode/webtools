@@ -91,4 +91,5 @@ $("sidebar")&&$("sidebar").classList.remove("open");
 $("overlay")&&$("overlay").classList.remove("show");
 if(tg&&!tg.dataset.inited){try{TOOL.init();tg.dataset.inited="1"}catch(e){console.warn(e)}}})}
 if(typeof window.applyIcons==="function")window.applyIcons()}
-if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",()=>setTimeout(inject,250));else setTimeout(inject,250)})();
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",()=>setTimeout(inject,250));else setTimeout(inject,250)if(window.registerTool&&!window.__reg_apk){window.__reg_apk=1;window.registerTool("apk",()=>{const t=document.querySelector('button[data-tool="apk"]');if(t)t.click()})}
+})();

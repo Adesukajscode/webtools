@@ -262,4 +262,5 @@ function boot(){
 }
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",()=>setTimeout(boot,500));else setTimeout(boot,500);
 window.YouTubePlayer={extractID,play};
+if(window.registerTool&&!window.__reg_youtube){window.__reg_youtube=1;window.registerTool("youtube",()=>{const t=document.querySelector('button[data-tool="youtube"]');if(t)t.click()})}
 })();

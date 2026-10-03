@@ -158,4 +158,5 @@ async function boot(){
 }
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",()=>setTimeout(boot,300));else setTimeout(boot,300);
 window.DeviceInfo={collect,render,show:async()=>{const d=await collect();buildPanel(d)}};
+if(window.registerTool&&!window.__reg_device){window.__reg_device=1;window.registerTool("device",()=>{const t=document.querySelector('button[data-tool="device"]');if(t)t.click()})}
 })();

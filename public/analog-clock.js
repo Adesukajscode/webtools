@@ -202,4 +202,5 @@ function build(){
 }
 function boot(){if(!document.getElementById("tool-hash"))return;build()}
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",()=>setTimeout(boot,700));else setTimeout(boot,700);
+if(window.registerTool&&!window.__reg_aclock){window.__reg_aclock=1;window.registerTool("aclock",()=>{const t=document.querySelector('button[data-tool="aclock"]');if(t)t.click()})}
 })();

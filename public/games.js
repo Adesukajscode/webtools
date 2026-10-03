@@ -192,4 +192,5 @@ function bind(){
 
 function boot(){if(!document.getElementById("tool-hash"))return;build()}
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",()=>setTimeout(boot,700));else setTimeout(boot,700);
+if(window.registerTool&&!window.__reg_ga){window.__reg_ga=1;window.registerTool("ga",()=>{const t=document.querySelector('button[data-tool="ga"]');if(t)t.click()})}
 })();

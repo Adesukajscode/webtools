@@ -85,4 +85,5 @@ $("sidebar")&&$("sidebar").classList.remove("open");
 $("overlay")&&$("overlay").classList.remove("show");
 if(tg&&!tg.dataset.inited){try{TOOL.init();tg.dataset.inited="1"}catch(e){console.warn(e)}}})}
 if(typeof window.applyIcons==="function")window.applyIcons()}
-if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",()=>setTimeout(inject,200));else setTimeout(inject,200)})();
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",()=>setTimeout(inject,200));else setTimeout(inject,200)if(window.registerTool&&!window.__reg_dl){window.__reg_dl=1;window.registerTool("dl",()=>{const t=document.querySelector('button[data-tool="dl"]');if(t)t.click()})}
+})();

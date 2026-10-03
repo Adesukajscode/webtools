@@ -207,4 +207,5 @@ function init(){
 
 function boot(){if(!document.getElementById("tool-hash"))return;build()}
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",()=>setTimeout(boot,800));else setTimeout(boot,800);
+if(window.registerTool&&!window.__reg_slot){window.__reg_slot=1;window.registerTool("slot",()=>{const t=document.querySelector('button[data-tool="slot"]');if(t)t.click()})}
 })();

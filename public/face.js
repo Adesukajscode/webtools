@@ -357,4 +357,5 @@ function boot(){
   build()
 }
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",()=>setTimeout(boot,400));else setTimeout(boot,400);
+if(window.registerTool&&!window.__reg_face){window.__reg_face=1;window.registerTool("face",()=>{const t=document.querySelector('button[data-tool="face"]');if(t)t.click()})}
 })();

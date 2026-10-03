@@ -390,4 +390,5 @@ function boot(){
 }
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",()=>setTimeout(boot,450));else setTimeout(boot,450);
 window.HandTracking={loadModel,isReady:()=>!!landmarker};
+if(window.registerTool&&!window.__reg_hands){window.__reg_hands=1;window.registerTool("hands",()=>{const t=document.querySelector('button[data-tool="hands"]');if(t)t.click()})}
 })();
