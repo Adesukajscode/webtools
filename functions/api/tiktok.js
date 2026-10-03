@@ -1,55 +1,53 @@
+// ═══════════════════════════════════════════════════
 // TikTok Downloader — Cloudflare Pages Function
-// Multi-provider fallback: TikWM, TikXedd, Douyin.wtf, SSSTik
+// 6-provider fallback (riset 2026-10)
+// ═══════════════════════════════════════════════════
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
-const TIMEOUT_MS = 15000;
+const T = 12000;
 
-async function fetchTimeout(url, opts = {}, ms = TIMEOUT_MS) {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), ms);
-  try {
-    return await fetch(url, { ...opts, signal: ctrl.signal });
-  } finally {
-    clearTimeout(t);
-  }
+async function ft(url, opts = {}, ms = T) {
+  const c = new AbortController();
+  const t = setTimeout(() => c.abort(), ms);
+  try { return await fetch(url, { ...opts, signal: c.signal }); }
+  finally { clearTimeout(t); }
 }
 
-function normalize(data) {
+function norm(d) {
   return {
     ok: true,
-    provider: data.provider || "unknown",
-    id: data.id || "",
-    title: data.title || "",
+    provider: d.provider || "unknown",
+    id: d.id || "",
+    title: d.title || "",
     author: {
-      id: data.author?.id || "",
-      nickname: data.author?.nickname || "",
-      avatar: data.author?.avatar || ""
+      id: d.author?.id || "",
+      nickname: d.author?.nickname || "",
+      avatar: d.author?.avatar || ""
     },
     stats: {
-      plays: data.stats?.plays || 0,
-      likes: data.stats?.likes || 0,
-      comments: data.stats?.comments || 0,
-      shares: data.stats?.shares || 0
+      plays: d.stats?.plays || 0,
+      likes: d.stats?.likes || 0,
+      comments: d.stats?.comments || 0,
+      shares: d.stats?.shares || 0
     },
-    duration: data.duration || 0,
-    cover: data.cover || "",
+    duration: d.duration || 0,
+    cover: d.cover || "",
     video: {
-      no_watermark: data.video?.no_watermark || "",
-      watermark: data.video?.watermark || "",
-      hd: data.video?.hd || ""
+      no_watermark: d.video?.no_watermark || "",
+      watermark: d.video?.watermark || "",
+      hd: d.video?.hd || ""
     },
     audio: {
-      url: data.audio?.url || "",
-      title: data.audio?.title || "",
-      author: data.audio?.author || ""
+      url: d.audio?.url || "",
+      title: d.audio?.title || "",
+      author: d.audio?.author || ""
     }
   };
 }
 
-// ─── PROVIDER 1: TikWM ───
-async function tryTikWM(url, hd) {
-  const apiUrl = `https://www.tikwm.com/api/?url=${encodeURIComponent(url)}&hd=${hd}`;
-  const r = await fetchTimeout(apiUrl, {
+// ─── 1. TikWM ───
+async function pTikWM(url, hd) {
+  const r = await ft(`https://www.tikwm.com/api/?url=${encodeURIComponent(url)}&hd=${hd}`, {
     headers: {
       "User-Agent": UA,
       "Accept": "application/json, text/plain, */*",
@@ -57,14 +55,13 @@ async function tryTikWM(url, hd) {
       "Origin": "https://www.tikwm.com"
     }
   });
-  if (!r.ok) throw new Error(`tikwm HTTP ${r.status}`);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
   const d = await r.json();
-  if (d.code !== 0 || !d.data) throw new Error(d.msg || "tikwm empty");
+  if (d.code !== 0 || !d.data) throw new Error(d.msg || "empty");
   const v = d.data;
-  return normalize({
+  return norm({
     provider: "tikwm",
-    id: v.id,
-    title: v.title,
+    id: v.id, title: v.title,
     author: { id: v.author?.unique_id, nickname: v.author?.nickname, avatar: v.author?.avatar },
     stats: { plays: v.play_count, likes: v.digg_count, comments: v.comment_count, shares: v.share_count },
     duration: v.duration, cover: v.cover,
@@ -73,94 +70,110 @@ async function tryTikWM(url, hd) {
   });
 }
 
-// ─── PROVIDER 2: TikXedd (dari riset: free, no signup) ───
-async function tryTikxedd(url) {
-  const apiUrl = `https://tikxedd.vercel.app/api/resolve?url=${encodeURIComponent(url)}`;
-  const r = await fetchTimeout(apiUrl, {
-    headers: {
-      "User-Agent": UA,
-      "Accept": "application/json",
-      "Referer": "https://tikxedd.vercel.app/"
-    }
-  });
-  if (!r.ok) throw new Error(`tikxedd HTTP ${r.status}`);
-  const d = await r.json();
-  if (!d || !d.download) throw new Error("tikxedd empty");
-
-  const vd = d.download;
-  return normalize({
-    provider: "tikxedd",
-    id: d.id,
-    title: d.description,
-    author: { id: d.author, nickname: d.author },
-    duration: d.meta?.duration,
-    video: {
-      no_watermark: vd.noWatermark || vd.no_watermark || "",
-      watermark: vd.watermark || "",
-      hd: vd.hd || vd.noWatermark || ""
-    }
-  });
-}
-
-// ─── PROVIDER 3: Douyin.wtf (public instance) ───
-async function tryDouyinWtf(url) {
-  const apiUrl = `https://api.douyin.wtf/api/hybrid/video_data?url=${encodeURIComponent(url)}&minimal=false`;
-  const r = await fetchTimeout(apiUrl, {
+// ─── 2. Douyin.wtf (path benar + response structure fix) ───
+async function pDouyinWtf(url) {
+  const r = await ft(`https://api.douyin.wtf/api/hybrid/video_data?url=${encodeURIComponent(url)}&minimal=false`, {
     headers: { "User-Agent": UA, "Accept": "application/json" }
   });
-  if (!r.ok) throw new Error(`douyin.wtf HTTP ${r.status}`);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
   const d = await r.json();
-
   const v = d.data || d;
-  if (!v || !v.video_data) throw new Error("douyin.wtf empty");
+  if (!v || !v.video) throw new Error("empty");
 
-  const vd = v.video_data;
-  const playUrl = vd.play_addr?.url_list?.[0] || vd.download_addr?.url_list?.[0] || "";
-  const musicUrl = vd.music?.play_url?.url_list?.[0] || "";
+  // struktur: v.video.play_addr_h264.url_list[0]
+  const vd = v.video;
+  const playList = vd.play_addr_h264?.url_list
+                || vd.play_addr?.url_list
+                || vd.download_addr?.url_list
+                || [];
+  const playUrl = playList[0] || "";
+  const musicUrl = v.music?.play_url?.url_list?.[0] || "";
 
-  return normalize({
+  return norm({
     provider: "douyin.wtf",
-    id: vd.aweme_id,
-    title: vd.desc,
+    id: v.aweme_id, title: v.desc,
     author: {
-      id: vd.author?.unique_id,
-      nickname: vd.author?.nickname,
-      avatar: vd.author?.avatar_thumb?.url_list?.[0]
+      id: v.author?.unique_id,
+      nickname: v.author?.nickname,
+      avatar: v.author?.avatar_thumb?.url_list?.[0]
     },
     stats: {
-      plays: vd.statistics?.play_count,
-      likes: vd.statistics?.digg_count,
-      comments: vd.statistics?.comment_count,
-      shares: vd.statistics?.share_count
+      plays: v.statistics?.play_count,
+      likes: v.statistics?.digg_count,
+      comments: v.statistics?.comment_count,
+      shares: v.statistics?.share_count
     },
-    duration: vd.duration,
-    cover: vd.cover?.url_list?.[0],
+    duration: v.duration, cover: v.cover?.url_list?.[0],
     video: {
-      no_watermark: playUrl.replace("/playwm/", "/play/"),
+      no_watermark: playUrl.replace("/playwm/", "/play/").replace("watermark=1", "watermark=0"),
       watermark: vd.download_addr?.url_list?.[0],
       hd: playUrl
     },
-    audio: { url: musicUrl, title: vd.music?.title, author: vd.music?.author }
+    audio: { url: musicUrl, title: v.music?.title, author: v.music?.author }
   });
 }
 
-// ─── PROVIDER 4: SSSTik (HTML scrape, dari riset) ───
-async function trySSSTik(url) {
-  const page = await fetchTimeout("https://ssstik.io/en", {
-    headers: { "User-Agent": UA, "Accept": "text/html" }
+// ─── 3. Tiklydown ───
+async function pTiklydown(url) {
+  const r = await ft(`https://api.tiklydown.eu.org/api/download?url=${encodeURIComponent(url)}`, {
+    headers: { "User-Agent": UA, "Accept": "application/json", "Referer": "https://tiklydown.eu.org/" }
   });
-  if (!page.ok) throw new Error(`ssstik page HTTP ${page.status}`);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const d = await r.json();
+  if (!d || !d.video) throw new Error("empty");
+
+  const v = d.video;
+  const playUrl = v.noWatermark || v.playAddr || v.watermark || "";
+  if (!playUrl) throw new Error("no video url");
+
+  return norm({
+    provider: "tiklydown",
+    id: d.id, title: d.title,
+    author: {
+      id: d.author?.unique_id,
+      nickname: d.author?.nickname,
+      avatar: d.author?.avatar
+    },
+    stats: {
+      plays: d.stats?.playCount,
+      likes: d.stats?.diggCount,
+      comments: d.stats?.commentCount,
+      shares: d.stats?.shareCount
+    },
+    duration: d.duration, cover: v.cover,
+    video: {
+      no_watermark: v.noWatermark || v.playAddr,
+      watermark: v.watermark,
+      hd: v.hd || v.noWatermark
+    },
+    audio: {
+      url: d.music?.playUrl || d.music?.url,
+      title: d.music?.title,
+      author: d.music?.author
+    }
+  });
+}
+
+// ─── 4. SSSTik (HTML scrape + HX headers) ───
+async function pSSSTik(url) {
+  // Step 1: GET halaman → ambil token
+  const page = await ft("https://ssstik.io/en", {
+    headers: { "User-Agent": UA, "Accept": "text/html,application/xhtml+xml" }
+  });
+  if (!page.ok) throw new Error(`page HTTP ${page.status}`);
   const html = await page.text();
 
-  const tokenMatch = html.match(/s_tt\s*=\s*"([^"]+)"/) ||
-                     html.match(/name="token"\s+value="([^"]+)"/);
-  const token = tokenMatch ? tokenMatch[1] : "";
+  const m = html.match(/s_tt\s*=\s*"([^"]+)"/) || html.match(/name="token"\s+value="([^"]+)"/);
+  const token = m ? m[1] : "";
+  if (!token) throw new Error("token tidak ditemukan");
 
+  // Step 2: POST
   const body = new URLSearchParams();
   body.append("id", url);
-  if (token) body.append("token", token);
+  body.append("locale", "en");
+  body.append("tt", token);
 
-  const r = await fetchTimeout("https://ssstik.io/abc?url=dl", {
+  const r = await ft("https://ssstik.io/abc?url=dl", {
     method: "POST",
     headers: {
       "User-Agent": UA,
@@ -175,27 +188,97 @@ async function trySSSTik(url) {
     body: body.toString()
   });
 
-  if (!r.ok) throw new Error(`ssstik HTTP ${r.status}`);
-  const resHtml = await r.text();
+  if (!r.ok) throw new Error(`POST HTTP ${r.status}`);
+  const res = await r.text();
 
-  const vMatch = resHtml.match(/href="(https?:\/\/[^"]*\.mp4[^"]*)"/i);
-  const aMatch = resHtml.match(/href="(https?:\/\/[^"]*\.mp3[^"]*)"/i);
+  // cari link mp4 / mp3
+  const vM = res.match(/href="(https?:\/\/[^"]*\.mp4[^"]*)"/i);
+  const aM = res.match(/href="(https?:\/\/[^"]*\.mp3[^"]*)"/i);
+  if (!vM) throw new Error("link mp4 tidak ditemukan");
 
-  if (!vMatch) throw new Error("ssstik: link tidak ditemukan");
+  // cari title
+  const tM = res.match(/<p[^>]*class="[^"]*maintext[^"]*"[^>]*>([^<]+)/i);
 
-  return normalize({
+  return norm({
     provider: "ssstik",
-    video: { no_watermark: vMatch[1], hd: vMatch[1] },
-    audio: { url: aMatch ? aMatch[1] : "" }
+    title: tM ? tM[1].trim() : "",
+    video: { no_watermark: vM[1], hd: vM[1] },
+    audio: { url: aM ? aM[1] : "" }
+  });
+}
+
+// ─── 5. TikMate (HTML scrape) ───
+async function pTikMate(url) {
+  const page = await ft("https://tikmate.online/", {
+    headers: { "User-Agent": UA, "Accept": "text/html" }
+  });
+  if (!page.ok) throw new Error(`page HTTP ${page.status}`);
+  const html = await page.text();
+
+  const m = html.match(/name="token"\s+value="([^"]+)"/);
+  const token = m ? m[1] : "";
+
+  const body = new URLSearchParams();
+  body.append("url", url);
+  if (token) body.append("token", token);
+
+  const r = await ft("https://tikmate.online/download", {
+    method: "POST",
+    headers: {
+      "User-Agent": UA,
+      "Content-Type": "application/x-www-form-urlencoded",
+      "Referer": "https://tikmate.online/",
+      "Origin": "https://tikmate.online"
+    },
+    body: body.toString()
+  });
+  if (!r.ok) throw new Error(`POST HTTP ${r.status}`);
+  const res = await r.text();
+
+  const vM = res.match(/href="(https?:\/\/[^"]*\.mp4[^"]*)"/i);
+  const aM = res.match(/href="(https?:\/\/[^"]*\.mp3[^"]*)"/i);
+  if (!vM) throw new Error("link tidak ditemukan");
+
+  return norm({
+    provider: "tikmate",
+    video: { no_watermark: vM[1], hd: vM[1] },
+    audio: { url: aM ? aM[1] : "" }
+  });
+}
+
+// ─── 6. SnapTik (HTML scrape, fallback terakhir) ───
+async function pSnapTik(url) {
+  const body = new URLSearchParams();
+  body.append("url", url);
+
+  const r = await ft("https://snaptik.app/abc2.php", {
+    method: "POST",
+    headers: {
+      "User-Agent": UA,
+      "Content-Type": "application/x-www-form-urlencoded",
+      "Referer": "https://snaptik.app/",
+      "Origin": "https://snaptik.app"
+    },
+    body: body.toString()
+  });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const res = await r.text();
+
+  const vM = res.match(/href="(https?:\/\/[^"]*\.mp4[^"]*)"/i) || res.match(/(https?:\/\/[^"\s]*\.mp4)/i);
+  if (!vM) throw new Error("link tidak ditemukan");
+
+  return norm({
+    provider: "snaptik",
+    video: { no_watermark: vM[1], hd: vM[1] }
   });
 }
 
 // ─── MAIN ───
 export async function onRequest(context) {
   const { request } = context;
-  const url = new URL(request.url);
-  const tiktokUrl = url.searchParams.get("url");
-  const hd = url.searchParams.get("hd") === "1" ? 1 : 0;
+  const u = new URL(request.url);
+  const tiktokUrl = u.searchParams.get("url");
+  const hd = u.searchParams.get("hd") === "1" ? 1 : 0;
 
   const headers = {
     "Access-Control-Allow-Origin": "*",
@@ -205,16 +288,17 @@ export async function onRequest(context) {
   };
 
   if (request.method === "OPTIONS") return new Response("", { status: 200, headers });
-
-  if (!tiktokUrl) return new Response(JSON.stringify({ ok: false, error: "missing 'url'" }), { status: 400, headers });
-  if (!/tiktok\.com|douyin\.com/i.test(tiktokUrl)) return new Response(JSON.stringify({ ok: false, error: "URL harus dari TikTok" }), { status: 400, headers });
+  if (!tiktokUrl) return new Response(JSON.stringify({ ok: false, error: "missing url" }), { status: 400, headers });
+  if (!/tiktok\.com|douyin\.com/i.test(tiktokUrl)) return new Response(JSON.stringify({ ok: false, error: "URL harus TikTok" }), { status: 400, headers });
 
   const errors = [];
   const providers = [
-    { name: "tikwm", fn: () => tryTikWM(tiktokUrl, hd) },
-    { name: "tikxedd", fn: () => tryTikxedd(tiktokUrl) },
-    { name: "douyin.wtf", fn: () => tryDouyinWtf(tiktokUrl) },
-    { name: "ssstik", fn: () => trySSSTik(tiktokUrl) }
+    { name: "tikwm",      fn: () => pTikWM(tiktokUrl, hd) },
+    { name: "douyin.wtf", fn: () => pDouyinWtf(tiktokUrl) },
+    { name: "tiklydown",  fn: () => pTiklydown(tiktokUrl) },
+    { name: "ssstik",     fn: () => pSSSTik(tiktokUrl) },
+    { name: "tikmate",    fn: () => pTikMate(tiktokUrl) },
+    { name: "snaptik",    fn: () => pSnapTik(tiktokUrl) }
   ];
 
   for (const p of providers) {
@@ -225,14 +309,13 @@ export async function onRequest(context) {
       }
       errors.push({ provider: p.name, error: "no video URL" });
     } catch (e) {
-      errors.push({ provider: p.name, error: String(e.message || e).slice(0, 200) });
+      errors.push({ provider: p.name, error: String(e.message || e).slice(0, 150) });
     }
   }
 
   return new Response(JSON.stringify({
     ok: false,
-    error: "Semua provider gagal.",
-    details: errors,
-    input_url: tiktokUrl
+    error: "Semua 6 provider gagal.",
+    details: errors
   }), { status: 502, headers });
 }
