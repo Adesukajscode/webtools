@@ -3,13 +3,7 @@
   functions = "netlify/functions"
 
 [dev]
-  port = 8888
   publish = "public"
   functions = "netlify/functions"
-
-[[headers]]
-  for = "/*"
-  [headers.values]
-    X-Frame-Options = "DENY"
-    X-Content-Type-Options = "nosniff"
-    Referrer-Policy = "strict-origin-when-cross-origin"
+  port = 8888
+  edgeFunctions = false

@@ -1,1 +1,215 @@
-...
+<!DOCTYPE html>
+<html lang="id" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0f">
+<title>CyberToolbox — Developer Utilities</title>
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-icon" data-icon="tool"></div>
+      <div>
+        <div class="brand-name">CyberToolbox</div>
+        <div class="brand-sub">16 tools · 1 page</div>
+      </div>
+    </div>
+    <div class="search-wrap">
+      <span class="search-icon" data-icon="search"></span>
+      <input type="text" id="search" placeholder="Cari tool... (Ctrl+K)" autocomplete="off">
+    </div>
+    <nav class="nav" id="nav">
+      <button data-tool="hash"><span class="nav-icon" data-icon="hash"></span> Hash</button>
+      <button data-tool="base64"><span class="nav-icon" data-icon="base64"></span> Base64</button>
+      <button data-tool="url"><span class="nav-icon" data-icon="url"></span> URL</button>
+      <button data-tool="hex"><span class="nav-icon" data-icon="hex"></span> Hex</button>
+      <button data-tool="jwt"><span class="nav-icon" data-icon="jwt"></span> JWT</button>
+      <button data-tool="uuid"><span class="nav-icon" data-icon="uuid"></span> UUID</button>
+      <button data-tool="password"><span class="nav-icon" data-icon="password"></span> Password</button>
+      <button data-tool="qr"><span class="nav-icon" data-icon="qr"></span> QR Code</button>
+      <button data-tool="json"><span class="nav-icon" data-icon="json"></span> JSON</button>
+      <button data-tool="regex"><span class="nav-icon" data-icon="regex"></span> Regex</button>
+      <button data-tool="color"><span class="nav-icon" data-icon="color"></span> Color</button>
+      <button data-tool="cron"><span class="nav-icon" data-icon="cron"></span> Cron</button>
+      <button data-tool="ip"><span class="nav-icon" data-icon="ip"></span> IP Lookup</button>
+      <button data-tool="text"><span class="nav-icon" data-icon="text"></span> Text</button>
+      <button data-tool="time"><span class="nav-icon" data-icon="time"></span> Time</button>
+      <button data-tool="tiktok"><span class="nav-icon" data-icon="video"></span> TikTok DL</button>
+    </nav>
+    <div class="sidebar-footer">
+      <button id="theme-toggle" class="theme-btn"><span id="theme-icon" data-icon="moon"></span></button>
+      <div class="ver">v3.0</div>
+    </div>
+  </aside>
+  <div class="overlay" id="overlay"></div>
+  <main class="main">
+    <header class="topbar">
+      <button class="menu-btn" id="menu-btn"><span data-icon="menu"></span></button>
+      <div class="topbar-title" id="current-tool-title">Hash Generator</div>
+      <div class="topbar-actions">
+        <button id="copy-all" class="icon-btn" data-icon="copy"></button>
+      </div>
+    </header>
+    <div class="content">
+      <section id="tool-hash" class="tool active">
+        <div class="tool-head"><h2>Hash Generator</h2><p>Generate MD5, SHA-1, SHA-256, SHA-512</p></div>
+        <textarea id="hash-input" placeholder="Ketik teks..." data-persist></textarea>
+        <div class="row">
+          <button class="btn primary" onclick="genHash('MD5')">MD5</button>
+          <button class="btn primary" onclick="genHash('SHA-1')">SHA-1</button>
+          <button class="btn primary" onclick="genHash('SHA-256')">SHA-256</button>
+          <button class="btn primary" onclick="genHash('SHA-512')">SHA-512</button>
+        </div>
+        <div id="hash-output" class="output" data-copyable></div>
+      </section>
+      <section id="tool-base64" class="tool">
+        <div class="tool-head"><h2>Base64 Encoder / Decoder</h2><p>Encode teks ke Base64 atau decode kembali</p></div>
+        <textarea id="b64-input" placeholder="Teks atau Base64..." data-persist></textarea>
+        <div class="row">
+          <button class="btn primary" onclick="b64Encode()">Encode →</button>
+          <button class="btn" onclick="b64Decode()">← Decode</button>
+        </div>
+        <div id="b64-output" class="output" data-copyable></div>
+      </section>
+      <section id="tool-url" class="tool">
+        <div class="tool-head"><h2>URL Encoder / Decoder</h2><p>Encode, decode, dan parse URL</p></div>
+        <textarea id="url-input" placeholder="Teks atau URL..." data-persist></textarea>
+        <div class="row">
+          <button class="btn primary" onclick="urlEncode()">Encode</button>
+          <button class="btn" onclick="urlDecode()">Decode</button>
+          <button class="btn" onclick="urlParse()">Parse</button>
+        </div>
+        <div id="url-output" class="output" data-copyable></div>
+      </section>
+      <section id="tool-hex" class="tool">
+        <div class="tool-head"><h2>Hex Encoder / Decoder</h2><p>Konversi teks ↔ hexadesimal</p></div>
+        <textarea id="hex-input" placeholder="Teks atau hex..." data-persist></textarea>
+        <div class="row">
+          <button class="btn primary" onclick="hexEncode()">Text → Hex</button>
+          <button class="btn" onclick="hexDecode()">Hex → Text</button>
+        </div>
+        <div id="hex-output" class="output" data-copyable></div>
+      </section>
+      <section id="tool-jwt" class="tool">
+        <div class="tool-head"><h2>JWT Decoder</h2><p>Decode header, payload, cek masa berlaku</p></div>
+        <textarea id="jwt-input" placeholder="Paste JWT token..." data-persist></textarea>
+        <button class="btn primary" onclick="jwtDecode()">Decode JWT</button>
+        <div id="jwt-output" class="output" data-copyable></div>
+      </section>
+      <section id="tool-uuid" class="tool">
+        <div class="tool-head"><h2>UUID Generator</h2><p>Generate UUID v4</p></div>
+        <div class="row">
+          <button class="btn primary" onclick="genUUID(1)">1</button>
+          <button class="btn" onclick="genUUID(10)">10</button>
+          <button class="btn" onclick="genUUID(100)">100</button>
+          <button class="btn" onclick="genUUID(1000)">1000</button>
+        </div>
+        <div id="uuid-output" class="output" data-copyable></div>
+      </section>
+      <section id="tool-password" class="tool">
+        <div class="tool-head"><h2>Password Generator</h2><p>Password kuat dengan opsi kustom</p></div>
+        <div class="pw-controls">
+          <label>Panjang: <input type="number" id="pw-len" value="20" min="4" max="128"></label>
+          <label class="chk"><input type="checkbox" id="pw-upper" checked> Upper</label>
+          <label class="chk"><input type="checkbox" id="pw-lower" checked> Lower</label>
+          <label class="chk"><input type="checkbox" id="pw-digit" checked> Digits</label>
+          <label class="chk"><input type="checkbox" id="pw-sym" checked> Symbols</label>
+        </div>
+        <div class="pw-strength" id="pw-strength"></div>
+        <button class="btn primary" onclick="genPassword()">Generate</button>
+        <div id="pw-output" class="output" data-copyable></div>
+      </section>
+      <section id="tool-qr" class="tool">
+        <div class="tool-head"><h2>QR Code Generator</h2><p>Generate QR dari teks atau URL</p></div>
+        <input id="qr-input" type="text" placeholder="Teks atau URL..." value="https://netlify.com" data-persist>
+        <div class="row">
+          <button class="btn primary" onclick="genQR()">Generate</button>
+          <button class="btn" onclick="downloadQR()">Download</button>
+        </div>
+        <div id="qr-output" class="output center"></div>
+      </section>
+      <section id="tool-json" class="tool">
+        <div class="tool-head"><h2>JSON Formatter</h2><p>Format, minify, validasi JSON</p></div>
+        <textarea id="json-input" placeholder='{"key":"value"}' data-persist></textarea>
+        <div class="row">
+          <button class="btn primary" onclick="jsonFormat(2)">Pretty (2)</button>
+          <button class="btn" onclick="jsonFormat(4)">Pretty (4)</button>
+          <button class="btn" onclick="jsonMinify()">Minify</button>
+          <button class="btn" onclick="jsonValidate()">Validate</button>
+        </div>
+        <div id="json-output" class="output" data-copyable></div>
+      </section>
+      <section id="tool-regex" class="tool">
+        <div class="tool-head"><h2>Regex Tester</h2><p>Test regex dengan highlight</p></div>
+        <input id="regex-pattern" type="text" placeholder="pattern: \d+" data-persist>
+        <input id="regex-flags" type="text" placeholder="flags: gim" value="g">
+        <textarea id="regex-text" placeholder="Teks test..." data-persist></textarea>
+        <button class="btn primary" onclick="testRegex()">Test</button>
+        <div id="regex-output" class="output" data-copyable></div>
+      </section>
+      <section id="tool-color" class="tool">
+        <div class="tool-head"><h2>Color Converter</h2><p>HEX, RGB, HSL dengan preview</p></div>
+        <input id="color-input" type="text" placeholder="#ff2d55 / rgb(255,45,85)" value="#00d4ff" data-persist>
+        <div class="row">
+          <button class="btn primary" onclick="convertColor()">Convert</button>
+          <input type="color" id="color-picker" value="#00d4ff" oninput="document.getElementById('color-input').value=this.value;convertColor()">
+        </div>
+        <div id="color-output" class="output" data-copyable></div>
+      </section>
+      <section id="tool-cron" class="tool">
+        <div class="tool-head"><h2>Cron Parser</h2><p>Parse ekspresi cron ke bahasa manusia</p></div>
+        <input id="cron-input" type="text" placeholder="*/5 * * * *" value="*/5 * * * *" data-persist>
+        <button class="btn primary" onclick="parseCron()">Parse</button>
+        <div id="cron-output" class="output" data-copyable></div>
+      </section>
+      <section id="tool-ip" class="tool">
+        <div class="tool-head"><h2>IP Lookup</h2><p>Geolokasi IP</p></div>
+        <input id="ip-input" type="text" placeholder="8.8.8.8 (kosong = IP kamu)" data-persist>
+        <button class="btn primary" onclick="lookupIP()">Lookup</button>
+        <div id="ip-output" class="output" data-copyable></div>
+      </section>
+      <section id="tool-text" class="tool">
+        <div class="tool-head"><h2>Text Utilities</h2><p>Stats dan case conversion</p></div>
+        <textarea id="text-input" placeholder="Paste teks..." data-persist></textarea>
+        <div class="row">
+          <button class="btn primary" onclick="textStats()">Stats</button>
+          <button class="btn" onclick="textCase('upper')">UPPER</button>
+          <button class="btn" onclick="textCase('lower')">lower</button>
+          <button class="btn" onclick="textCase('title')">Title</button>
+          <button class="btn" onclick="textCase('reverse')">Reverse</button>
+          <button class="btn" onclick="textCase('slug')">slug</button>
+        </div>
+        <div id="text-output" class="output" data-copyable></div>
+      </section>
+      <section id="tool-time" class="tool">
+        <div class="tool-head"><h2>Time / Timestamp</h2><p>Konversi timestamp ↔ tanggal</p></div>
+        <input id="time-input" type="text" placeholder="unix timestamp atau date" data-persist>
+        <div class="row">
+          <button class="btn primary" onclick="timeNow()">Now</button>
+          <button class="btn" onclick="timeParse()">Parse</button>
+        </div>
+        <div id="time-output" class="output" data-copyable></div>
+      </section>
+      <section id="tool-tiktok" class="tool">
+        <div class="tool-head"><h2>TikTok Downloader</h2><p>Download video TikTok tanpa watermark</p></div>
+        <input id="tiktok-input" type="text" placeholder="Paste URL TikTok..." data-persist>
+        <div class="row">
+          <button class="btn primary" onclick="tiktokFetch()">Ambil Info</button>
+          <button class="btn" onclick="tiktokDownload()">Download</button>
+          <button class="btn" onclick="tiktokAudio()">Audio Only</button>
+        </div>
+        <div id="tiktok-preview" class="output center"></div>
+        <div id="tiktok-output" class="output" data-copyable></div>
+      </section>
+    </div>
+  </main>
+</div>
+<div id="toast" class="toast"></div>
+<script src="icons.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

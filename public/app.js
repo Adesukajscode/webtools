@@ -1,7 +1,3 @@
-// ═══════════════════════════════════════════════════
-// CYBERTOOLBOX v2.0
-// ═══════════════════════════════════════════════════
-
 const TOOL_TITLES = {
   hash: "Hash Generator", base64: "Base64 Encoder/Decoder",
   url: "URL Encoder/Decoder", hex: "Hex Encoder/Decoder",
@@ -13,79 +9,63 @@ const TOOL_TITLES = {
   tiktok: "TikTok Downloader"
 };
 
-// ─── TOAST ───
 let toastTimer;
-function toast(msg, type = "info") {
-  const el = document.getElementById("toast");
+function toast(msg, type) {
+  type = type || "info";
+  var el = document.getElementById("toast");
   el.textContent = msg;
   el.className = "toast show " + type;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove("show"), 2000);
+  toastTimer = setTimeout(function() { el.classList.remove("show"); }, 2000);
 }
 
-// ─── COPY ───
 async function copyText(text) {
-  try {
-    await navigator.clipboard.writeText(text);
-    toast("✅ Copied to clipboard", "success");
-  } catch (e) {
-    // fallback
-    const ta = document.createElement("textarea");
-    ta.value = text;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand("copy");
-    document.body.removeChild(ta);
-    toast("✅ Copied", "success");
+  try { await navigator.clipboard.writeText(text); toast("✅ Copied", "success"); }
+  catch (e) {
+    var ta = document.createElement("textarea"); ta.value = text;
+    document.body.appendChild(ta); ta.select(); document.execCommand("copy");
+    document.body.removeChild(ta); toast("✅ Copied", "success");
   }
 }
 
-// ─── THEME ───
 function initTheme() {
-  const saved = localStorage.getItem("theme") || "dark";
+  var saved = localStorage.getItem("theme") || "dark";
   document.documentElement.setAttribute("data-theme", saved);
-  document.getElementById("theme-icon").textContent = saved === "dark" ? "🌙" : "☀️";
+  var icon = document.getElementById("theme-icon");
+  if (icon) icon.setAttribute("data-icon", saved === "dark" ? "moon" : "sun");
 }
 function toggleTheme() {
-  const cur = document.documentElement.getAttribute("data-theme");
-  const next = cur === "dark" ? "light" : "dark";
+  var cur = document.documentElement.getAttribute("data-theme");
+  var next = cur === "dark" ? "light" : "dark";
   document.documentElement.setAttribute("data-theme", next);
   localStorage.setItem("theme", next);
-  document.getElementById("theme-icon").textContent = next === "dark" ? "🌙" : "☀️";
-  document.querySelector('meta[name="theme-color"]')?.setAttribute(
-    "content", next === "dark" ? "#0a0a0f" : "#f5f5fa");
+  var icon = document.getElementById("theme-icon");
+  if (icon) { icon.setAttribute("data-icon", next === "dark" ? "moon" : "sun"); applyIcons(); }
 }
 
-// ─── TABS ───
 function switchTool(tool) {
-  document.querySelectorAll('.nav button').forEach(b =>
-    b.classList.toggle("active", b.dataset.tool === tool));
-  document.querySelectorAll(".tool").forEach(t => t.classList.remove("active"));
-  const target = document.getElementById("tool-" + tool);
+  document.querySelectorAll('.nav button').forEach(function(b) { b.classList.toggle("active", b.dataset.tool === tool); });
+  document.querySelectorAll(".tool").forEach(function(t) { t.classList.remove("active"); });
+  var target = document.getElementById("tool-" + tool);
   if (target) target.classList.add("active");
   document.getElementById("current-tool-title").textContent = TOOL_TITLES[tool] || tool;
   localStorage.setItem("lastTool", tool);
-  // mobile: close sidebar
   document.getElementById("sidebar").classList.remove("open");
   document.getElementById("overlay").classList.remove("show");
 }
 
-// ─── SEARCH ───
 function filterTools(q) {
-  const nav = document.getElementById("nav");
-  const buttons = nav.querySelectorAll("button");
-  let visible = 0;
+  var nav = document.getElementById("nav");
+  var buttons = nav.querySelectorAll("button");
+  var visible = 0;
   q = q.toLowerCase().trim();
-
-  buttons.forEach(btn => {
-    const name = TOOL_TITLES[btn.dataset.tool].toLowerCase();
-    const match = !q || name.includes(q);
+  buttons.forEach(function(btn) {
+    var name = TOOL_TITLES[btn.dataset.tool].toLowerCase();
+    var match = !q || name.includes(q);
     btn.style.display = match ? "" : "none";
     if (match) visible++;
   });
-
-  // empty state
-  let empty = nav.querySelector(".nav-empty");
+  var empty = nav.querySelector(".nav-empty");
   if (visible === 0) {
     if (!empty) {
       empty = document.createElement("div");
@@ -96,488 +76,293 @@ function filterTools(q) {
   } else if (empty) empty.remove();
 }
 
-// ─── HELPERS ───
-function out(id, html) {
-  document.getElementById(id).innerHTML = html;
-}
-function esc(s) {
-  return String(s).replace(/[&<>"']/g, c =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
-function kv(k, v) {
-  return `<div><span class="key">${esc(k)}</span>: <span class="val">${esc(v)}</span></div>`;
-}
+function out(id, html) { document.getElementById(id).innerHTML = html; }
+function esc(s) { return String(s).replace(/[&<>"']/g, function(c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
+function kv(k, v) { return '<div><span class="key">' + esc(k) + '</span>: <span class="val">' + esc(v) + '</span></div>'; }
 
-// ─── HASH ───
 async function genHash(algo) {
-  const text = document.getElementById("hash-input").value;
+  var text = document.getElementById("hash-input").value;
   if (!text) return toast("Isi teks dulu", "error");
-  const enc = new TextEncoder().encode(text);
-  const buf = await crypto.subtle.digest(algo, enc);
-  const hex = [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+  var enc = new TextEncoder().encode(text);
+  var buf = await crypto.subtle.digest(algo, enc);
+  var hex = Array.from(new Uint8Array(buf)).map(function(b) { return b.toString(16).padStart(2, "0"); }).join("");
   out("hash-output", kv(algo, hex));
 }
 
-// ─── BASE64 ───
-function b64Encode() {
-  try {
-    const t = document.getElementById("b64-input").value;
-    out("b64-output", btoa(unescape(encodeURIComponent(t))));
-  } catch (e) { out("b64-output", `<span class="err">${e.message}</span>`); }
-}
-function b64Decode() {
-  try {
-    const t = document.getElementById("b64-input").value.trim();
-    out("b64-output", decodeURIComponent(escape(atob(t))));
-  } catch (e) { out("b64-output", `<span class="err">Invalid base64</span>`); }
-}
+function b64Encode() { try { out("b64-output", btoa(unescape(encodeURIComponent(document.getElementById("b64-input").value)))); } catch (e) { out("b64-output", '<span class="err">' + e.message + '</span>'); } }
+function b64Decode() { try { out("b64-output", decodeURIComponent(escape(atob(document.getElementById("b64-input").value.trim())))); } catch (e) { out("b64-output", '<span class="err">Invalid base64</span>'); } }
 
-// ─── URL ───
-function urlEncode() {
-  out("url-output", encodeURIComponent(document.getElementById("url-input").value));
-}
-function urlDecode() {
-  try { out("url-output", decodeURIComponent(document.getElementById("url-input").value)); }
-  catch (e) { out("url-output", `<span class="err">${e.message}</span>`); }
-}
+function urlEncode() { out("url-output", encodeURIComponent(document.getElementById("url-input").value)); }
+function urlDecode() { try { out("url-output", decodeURIComponent(document.getElementById("url-input").value)); } catch (e) { out("url-output", '<span class="err">' + e.message + '</span>'); } }
 function urlParse() {
   try {
-    const u = new URL(document.getElementById("url-input").value);
-    let html = "";
-    ["protocol", "hostname", "port", "pathname", "search", "hash", "origin"].forEach(k =>
-      html += kv(k, u[k] || "(kosong)"));
-    const params = [...u.searchParams.entries()];
-    if (params.length) {
-      html += '<div style="margin-top:8px"><span class="key">query params:</span></div>';
-      params.forEach(([k, v]) => html += kv("  " + k, v));
-    }
+    var u = new URL(document.getElementById("url-input").value);
+    var html = "";
+    ["protocol", "hostname", "port", "pathname", "search", "hash", "origin"].forEach(function(k) { html += kv(k, u[k] || "(kosong)"); });
+    var params = Array.from(u.searchParams.entries());
+    if (params.length) { html += '<div style="margin-top:8px"><span class="key">params:</span></div>'; params.forEach(function(p) { html += kv("  " + p[0], p[1]); }); }
     out("url-output", html);
-  } catch (e) { out("url-output", `<span class="err">URL tidak valid</span>`); }
+  } catch (e) { out("url-output", '<span class="err">URL tidak valid</span>'); }
 }
 
-// ─── HEX ───
-function hexEncode() {
-  const t = document.getElementById("hex-input").value;
-  out("hex-output", [...new TextEncoder().encode(t)].map(b => b.toString(16).padStart(2, "0")).join(""));
-}
+function hexEncode() { out("hex-output", Array.from(new TextEncoder().encode(document.getElementById("hex-input").value)).map(function(b) { return b.toString(16).padStart(2, "0"); }).join("")); }
 function hexDecode() {
   try {
-    const h = document.getElementById("hex-input").value.replace(/\s/g, "");
-    const bytes = h.match(/.{1,2}/g).map(b => parseInt(b, 16));
+    var h = document.getElementById("hex-input").value.replace(/\s/g, "");
+    var bytes = h.match(/.{1,2}/g).map(function(b) { return parseInt(b, 16); });
     out("hex-output", new TextDecoder().decode(new Uint8Array(bytes)));
-  } catch (e) { out("hex-output", `<span class="err">Hex tidak valid</span>`); }
+  } catch (e) { out("hex-output", '<span class="err">Hex tidak valid</span>'); }
 }
 
-// ─── JWT ───
 function jwtDecode() {
   try {
-    const t = document.getElementById("jwt-input").value.trim();
-    const [h, p] = t.split(".");
-    if (!h || !p) throw new Error("format: header.payload.signature");
-    const dec = x => JSON.parse(atob(x.replace(/-/g, "+").replace(/_/g, "/")));
-    const header = dec(h), payload = dec(p);
-    let html = '<div><span class="key">HEADER:</span></div>';
-    html += `<div class="val">${esc(JSON.stringify(header, null, 2))}</div>`;
-    html += '<div style="margin-top:8px"><span class="key">PAYLOAD:</span></div>';
-    html += `<div class="val">${esc(JSON.stringify(payload, null, 2))}</div>`;
-    if (payload.exp) {
-      const exp = new Date(payload.exp * 1000);
-      const now = new Date();
-      html += `<div style="margin-top:8px"><span class="key">expires:</span> ${exp.toLocaleString()} ${exp > now ? "✅ valid" : "❌ expired"}</div>`;
-    }
-    if (payload.iat) {
-      html += `<div><span class="key">issued:</span> ${new Date(payload.iat * 1000).toLocaleString()}</div>`;
-    }
+    var t = document.getElementById("jwt-input").value.trim();
+    var parts = t.split(".");
+    if (parts.length < 2) throw new Error("format: header.payload.signature");
+    var dec = function(x) { return JSON.parse(atob(x.replace(/-/g, "+").replace(/_/g, "/"))); };
+    var header = dec(parts[0]), payload = dec(parts[1]);
+    var html = '<div><span class="key">HEADER:</span></div><div class="val">' + esc(JSON.stringify(header, null, 2)) + '</div>';
+    html += '<div style="margin-top:8px"><span class="key">PAYLOAD:</span></div><div class="val">' + esc(JSON.stringify(payload, null, 2)) + '</div>';
+    if (payload.exp) { var exp = new Date(payload.exp * 1000); html += '<div style="margin-top:8px"><span class="key">expires:</span> ' + exp.toLocaleString() + ' ' + (exp > new Date() ? "✅ valid" : "❌ expired") + '</div>'; }
     out("jwt-output", html);
-  } catch (e) { out("jwt-output", `<span class="err">${e.message}</span>`); }
+  } catch (e) { out("jwt-output", '<span class="err">' + e.message + '</span>'); }
 }
 
-// ─── UUID ───
-function genUUID(n) {
-  const ids = [];
-  for (let i = 0; i < n; i++) ids.push(crypto.randomUUID());
-  out("uuid-output", ids.join("\n"));
-  toast(`✅ ${n} UUID generated`, "success");
-}
+function genUUID(n) { var ids = []; for (var i = 0; i < n; i++) ids.push(crypto.randomUUID()); out("uuid-output", ids.join("\n")); toast("✅ " + n + " UUID", "success"); }
 
-// ─── PASSWORD ───
 function updateStrength() {
-  const len = +document.getElementById("pw-len").value;
-  const sets = ["pw-upper", "pw-lower", "pw-digit", "pw-sym"]
-    .filter(id => document.getElementById(id).checked).length;
-  let score = 0;
-  if (len >= 8) score += 20;
-  if (len >= 12) score += 20;
-  if (len >= 16) score += 20;
+  var len = +document.getElementById("pw-len").value;
+  var sets = ["pw-upper", "pw-lower", "pw-digit", "pw-sym"].filter(function(id) { return document.getElementById(id).checked; }).length;
+  var score = 0;
+  if (len >= 8) score += 20; if (len >= 12) score += 20; if (len >= 16) score += 20;
   score += sets * 10;
-  const bar = document.getElementById("pw-strength");
+  var bar = document.getElementById("pw-strength");
   bar.style.setProperty("--strength", Math.min(score, 100) + "%");
   if (score < 50) bar.style.setProperty("--strength-color", "var(--accent-2)");
   else if (score < 75) bar.style.setProperty("--strength-color", "var(--warning)");
   else bar.style.setProperty("--strength-color", "var(--success)");
 }
 function genPassword() {
-  const len = +document.getElementById("pw-len").value;
-  let chars = "";
+  var len = +document.getElementById("pw-len").value;
+  var chars = "";
   if (document.getElementById("pw-upper").checked) chars += "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   if (document.getElementById("pw-lower").checked) chars += "abcdefghijklmnopqrstuvwxyz";
   if (document.getElementById("pw-digit").checked) chars += "0123456789";
   if (document.getElementById("pw-sym").checked) chars += "!@#$%^&*()_+-=[]{}|;:,.<>?";
   if (!chars) return out("pw-output", '<span class="err">pilih minimal 1 opsi</span>');
-  const arr = new Uint32Array(len);
-  crypto.getRandomValues(arr);
-  out("pw-output", esc([...arr].map(x => chars[x % chars.length]).join("")));
+  var arr = new Uint32Array(len); crypto.getRandomValues(arr);
+  out("pw-output", esc(Array.from(arr).map(function(x) { return chars[x % chars.length]; }).join("")));
 }
 
-// ─── QR ───
 function genQR() {
-  const t = document.getElementById("qr-input").value || "https://netlify.com";
-  const url = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(t)}`;
-  out("qr-output", `<img id="qr-img" src="${url}" alt="QR">`);
+  var t = document.getElementById("qr-input").value || "https://netlify.com";
+  var url = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" + encodeURIComponent(t);
+  out("qr-output", '<img id="qr-img" src="' + url + '" alt="QR">');
 }
 function downloadQR() {
-  const img = document.getElementById("qr-img");
+  var img = document.getElementById("qr-img");
   if (!img) return toast("Generate QR dulu", "error");
-  const a = document.createElement("a");
-  a.href = img.src;
-  a.download = "qrcode.png";
-  a.target = "_blank";
-  a.click();
+  var a = document.createElement("a"); a.href = img.src; a.download = "qrcode.png"; a.target = "_blank"; a.click();
   toast("📥 Download QR", "success");
 }
 
-// ─── JSON ───
-function jsonFormat(n) {
-  try {
-    const o = JSON.parse(document.getElementById("json-input").value);
-    out("json-output", esc(JSON.stringify(o, null, n)));
-  } catch (e) { out("json-output", `<span class="err">${e.message}</span>`); }
-}
-function jsonMinify() {
-  try {
-    const o = JSON.parse(document.getElementById("json-input").value);
-    out("json-output", esc(JSON.stringify(o)));
-  } catch (e) { out("json-output", `<span class="err">${e.message}</span>`); }
-}
-function jsonValidate() {
-  try {
-    JSON.parse(document.getElementById("json-input").value);
-    out("json-output", '<span class="val">✅ JSON valid</span>');
-  } catch (e) { out("json-output", `<span class="err">❌ ${e.message}</span>`); }
-}
+function jsonFormat(n) { try { out("json-output", esc(JSON.stringify(JSON.parse(document.getElementById("json-input").value), null, n))); } catch (e) { out("json-output", '<span class="err">' + e.message + '</span>'); } }
+function jsonMinify() { try { out("json-output", esc(JSON.stringify(JSON.parse(document.getElementById("json-input").value)))); } catch (e) { out("json-output", '<span class="err">' + e.message + '</span>'); } }
+function jsonValidate() { try { JSON.parse(document.getElementById("json-input").value); out("json-output", '<span class="val">✅ JSON valid</span>'); } catch (e) { out("json-output", '<span class="err">❌ ' + e.message + '</span>'); } }
 
-// ─── REGEX ───
 function testRegex() {
   try {
-    const p = document.getElementById("regex-pattern").value;
-    const f = document.getElementById("regex-flags").value;
-    const t = document.getElementById("regex-text").value;
-    const re = new RegExp(p, f);
-    const matches = [...t.matchAll(re)];
-    let html = kv("total matches", matches.length);
+    var p = document.getElementById("regex-pattern").value;
+    var f = document.getElementById("regex-flags").value;
+    var t = document.getElementById("regex-text").value;
+    var re = new RegExp(p, f);
+    var matches = Array.from(t.matchAll(re));
+    var html = kv("total matches", matches.length);
     if (matches.length) {
       html += '<div style="margin-top:8px"><span class="key">matches:</span></div>';
-      matches.slice(0, 50).forEach((m, i) => {
-        html += `<div>  [${i}] <span class="val">"${esc(m[0])}"</span> <span class="dim">@ ${m.index}</span></div>`;
-        if (m.length > 1) {
-          m.slice(1).forEach((g, j) => html += `<div class="dim">    group ${j + 1}: ${esc(g)}</div>`);
-        }
+      matches.slice(0, 50).forEach(function(m, i) {
+        html += '<div>  [' + i + '] <span class="val">"' + esc(m[0]) + '"</span> <span class="dim">@ ' + m.index + '</span></div>';
       });
     }
     out("regex-output", html);
-  } catch (e) { out("regex-output", `<span class="err">${e.message}</span>`); }
+  } catch (e) { out("regex-output", '<span class="err">' + e.message + '</span>'); }
 }
 
-// ─── COLOR ───
 function convertColor() {
-  const c = document.getElementById("color-input").value.trim();
+  var c = document.getElementById("color-input").value.trim();
   try {
-    let r, g, b;
+    var r, g, b;
     if (c.startsWith("#")) {
-      const h = c.slice(1);
-      const full = h.length === 3 ? h.split("").map(x => x + x).join("") : h;
-      r = parseInt(full.slice(0, 2), 16);
-      g = parseInt(full.slice(2, 4), 16);
-      b = parseInt(full.slice(4, 6), 16);
+      var h = c.slice(1);
+      var full = h.length === 3 ? h.split("").map(function(x) { return x + x; }).join("") : h;
+      r = parseInt(full.slice(0, 2), 16); g = parseInt(full.slice(2, 4), 16); b = parseInt(full.slice(4, 6), 16);
     } else if (c.startsWith("rgb")) {
-      [r, g, b] = c.match(/\d+/g).map(Number);
+      var nums = c.match(/\d+/g).map(Number); r = nums[0]; g = nums[1]; b = nums[2];
     } else {
-      const [hh, ss, ll] = c.match(/\d+(\.\d+)?/g).map(Number);
-      const s = ss / 100, l = ll / 100;
-      const k = n => (n + hh / 30) % 12;
-      const a = s * Math.min(l, 1 - l);
-      const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+      var hh = parseFloat(c.match(/[\d.]+/g)[0]), ss = parseFloat(c.match(/[\d.]+/g)[1]), ll = parseFloat(c.match(/[\d.]+/g)[2]);
+      var s = ss / 100, l = ll / 100;
+      var k = function(n) { return (n + hh / 30) % 12; };
+      var a = s * Math.min(l, 1 - l);
+      var f = function(n) { return l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1))); };
       r = Math.round(f(0) * 255); g = Math.round(f(8) * 255); b = Math.round(f(4) * 255);
     }
-    const hex = "#" + [r, g, b].map(x => x.toString(16).padStart(2, "0")).join("");
-    const max = Math.max(r, g, b) / 255, min = Math.min(r, g, b) / 255;
-    const l = (max + min) / 2;
-    let h2 = 0, s2 = 0;
+    var hex = "#" + [r, g, b].map(function(x) { return x.toString(16).padStart(2, "0"); }).join("");
+    var max = Math.max(r, g, b) / 255, min = Math.min(r, g, b) / 255;
+    var l = (max + min) / 2, h2 = 0, s2 = 0;
     if (max !== min) {
-      const d = max - min;
+      var d = max - min;
       s2 = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-      h2 = max === r / 255 ? ((g / 255 - b / 255) / d + (g < b ? 6 : 0)) :
-        max === g / 255 ? ((b / 255 - r / 255) / d + 2) :
-          ((r / 255 - g / 255) / d + 4);
+      h2 = max === r / 255 ? ((g / 255 - b / 255) / d + (g < b ? 6 : 0)) : max === g / 255 ? ((b / 255 - r / 255) / d + 2) : ((r / 255 - g / 255) / d + 4);
       h2 *= 60;
     }
-    let html = kv("HEX", hex) + kv("RGB", `rgb(${r}, ${g}, ${b})`) +
-      kv("HSL", `hsl(${h2.toFixed(1)}, ${(s2 * 100).toFixed(1)}%, ${(l * 100).toFixed(1)}%)`);
-    html += `<div style="margin-top:10px;height:64px;background:${hex};border-radius:8px;border:1px solid var(--border)"></div>`;
+    var html = kv("HEX", hex) + kv("RGB", "rgb(" + r + ", " + g + ", " + b + ")") + kv("HSL", "hsl(" + h2.toFixed(1) + ", " + (s2 * 100).toFixed(1) + "%, " + (l * 100).toFixed(1) + "%)");
+    html += '<div style="margin-top:10px;height:64px;background:' + hex + ';border-radius:8px;border:1px solid var(--border)"></div>';
     out("color-output", html);
     document.getElementById("color-picker").value = hex;
   } catch (e) { out("color-output", '<span class="err">Format warna tidak dikenali</span>'); }
 }
 
-// ─── CRON ───
 function parseCron() {
-  const c = document.getElementById("cron-input").value.trim();
-  const parts = c.split(/\s+/);
+  var c = document.getElementById("cron-input").value.trim();
+  var parts = c.split(/\s+/);
   if (parts.length !== 5) return out("cron-output", '<span class="err">Butuh 5 field: menit jam tgl bulan hari</span>');
-  const [m, h, dom, mo, dow] = parts;
-  let html = "";
-  ({ minute: m, hour: h, "day-of-month": dom, month: mo, "day-of-week": dow })
-    .constructor === Object && Object.entries({ minute: m, hour: h, "day of month": dom, month: mo, "day of week": dow })
-      .forEach(([k, v]) => html += kv(k, v));
-  let desc = "Jalan ";
+  var m = parts[0], h = parts[1], dom = parts[2], mo = parts[3], dow = parts[4];
+  var html = "";
+  [["minute", m], ["hour", h], ["day of month", dom], ["month", mo], ["day of week", dow]].forEach(function(p) { html += kv(p[0], p[1]); });
+  var desc = "Jalan ";
   if (m === "*" && h === "*") desc += "setiap menit";
-  else if (m.startsWith("*/")) desc += `setiap ${m.slice(2)} menit`;
-  else desc += `pada menit ${m}`;
-  if (h !== "*") desc += `, jam ${h}`;
-  if (dom !== "*") desc += `, tanggal ${dom}`;
-  if (mo !== "*") desc += `, bulan ${mo}`;
-  if (dow !== "*") desc += `, hari ke-${dow}`;
-  html += `<div style="margin-top:8px"><span class="key">perkiraan:</span> <span class="val">${esc(desc)}</span></div>`;
+  else if (m.indexOf("*/") === 0) desc += "setiap " + m.slice(2) + " menit";
+  else desc += "pada menit " + m;
+  if (h !== "*") desc += ", jam " + h;
+  if (dom !== "*") desc += ", tanggal " + dom;
+  if (mo !== "*") desc += ", bulan " + mo;
+  if (dow !== "*") desc += ", hari ke-" + dow;
+  html += '<div style="margin-top:8px"><span class="key">perkiraan:</span> <span class="val">' + esc(desc) + '</span></div>';
   out("cron-output", html);
 }
 
-// ─── IP ───
 async function lookupIP() {
-  const ip = document.getElementById("ip-input").value.trim();
+  var ip = document.getElementById("ip-input").value.trim();
   out("ip-output", '<span class="dim">⏳ querying...</span>');
   try {
-    const url = ip ? `https://ipapi.co/${ip}/json/` : "https://ipapi.co/json/";
-    const r = await fetch(url);
-    const d = await r.json();
-    if (d.error) return out("ip-output", `<span class="err">${d.reason || "error"}</span>`);
-    let html = "";
-    ["ip", "city", "region", "country_name", "postal", "latitude", "longitude", "timezone", "org", "asn"].forEach(k => {
-      if (d[k]) html += kv(k, d[k]);
-    });
+    var url = ip ? "https://ipapi.co/" + ip + "/json/" : "https://ipapi.co/json/";
+    var r = await fetch(url);
+    var d = await r.json();
+    if (d.error) return out("ip-output", '<span class="err">' + (d.reason || "error") + '</span>');
+    var html = "";
+    ["ip", "city", "region", "country_name", "postal", "latitude", "longitude", "timezone", "org", "asn"].forEach(function(k) { if (d[k]) html += kv(k, d[k]); });
     out("ip-output", html);
-  } catch (e) { out("ip-output", `<span class="err">${e.message}</span>`); }
+  } catch (e) { out("ip-output", '<span class="err">' + e.message + '</span>'); }
 }
 
-// ─── TEXT ───
 function textStats() {
-  const t = document.getElementById("text-input").value;
-  const words = t.trim() ? t.trim().split(/\s+/).length : 0;
-  let html = "";
-  html += kv("characters", t.length);
-  html += kv("words", words);
-  html += kv("lines", t.split("\n").length);
-  html += kv("bytes", new TextEncoder().encode(t).length);
+  var t = document.getElementById("text-input").value;
+  var words = t.trim() ? t.trim().split(/\s+/).length : 0;
+  var html = kv("characters", t.length) + kv("words", words) + kv("lines", t.split("\n").length) + kv("bytes", new TextEncoder().encode(t).length);
   out("text-output", html);
 }
 function textCase(mode) {
-  const t = document.getElementById("text-input").value;
-  const map = {
-    upper: t.toUpperCase(),
-    lower: t.toLowerCase(),
-    title: t.replace(/\w\S*/g, w => w[0].toUpperCase() + w.slice(1).toLowerCase()),
-    reverse: [...t].reverse().join(""),
+  var t = document.getElementById("text-input").value;
+  var map = {
+    upper: t.toUpperCase(), lower: t.toLowerCase(),
+    title: t.replace(/\w\S*/g, function(w) { return w[0].toUpperCase() + w.slice(1).toLowerCase(); }),
+    reverse: t.split("").reverse().join(""),
     slug: t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
   };
   out("text-output", esc(map[mode]));
 }
 
-// ─── TIME ───
 function timeNow() {
-  const now = new Date();
-  let html = "";
-  html += kv("unix (s)", Math.floor(now.getTime() / 1000));
-  html += kv("unix (ms)", now.getTime());
-  html += kv("ISO", now.toISOString());
-  html += kv("local", now.toLocaleString());
-  html += kv("UTC", now.toUTCString());
+  var now = new Date();
+  var html = kv("unix (s)", Math.floor(now.getTime() / 1000)) + kv("unix (ms)", now.getTime()) + kv("ISO", now.toISOString()) + kv("local", now.toLocaleString()) + kv("UTC", now.toUTCString());
   out("time-output", html);
 }
 function timeParse() {
-  const v = document.getElementById("time-input").value.trim() || Date.now();
-  const d = new Date(/^\d+$/.test(v) ? (+v < 1e12 ? +v * 1000 : +v) : v);
+  var v = document.getElementById("time-input").value.trim() || Date.now();
+  var d = new Date(/^\d+$/.test(v) ? (+v < 1e12 ? +v * 1000 : +v) : v);
   if (isNaN(d)) return out("time-output", '<span class="err">format tidak valid</span>');
-  let html = "";
-  html += kv("ISO", d.toISOString());
-  html += kv("local", d.toLocaleString());
-  html += kv("UTC", d.toUTCString());
-  html += kv("unix", Math.floor(d.getTime() / 1000));
+  var html = kv("ISO", d.toISOString()) + kv("local", d.toLocaleString()) + kv("UTC", d.toUTCString()) + kv("unix", Math.floor(d.getTime() / 1000));
   out("time-output", html);
 }
 
-// ═══════════════════════════════════════════════════
-// INIT
-// ═══════════════════════════════════════════════════
-
-document.addEventListener("DOMContentLoaded", () => {
-  // theme
-  initTheme();
-  document.getElementById("theme-toggle").addEventListener("click", toggleTheme);
-
-  // nav
-  document.querySelectorAll(".nav button").forEach(btn =>
-    btn.addEventListener("click", () => switchTool(btn.dataset.tool)));
-
-  // restore last tool
-  const last = localStorage.getItem("lastTool") || "hash";
-  switchTool(last);
-
-  // search
-  document.getElementById("search").addEventListener("input", e =>
-    filterTools(e.target.value));
-
-  // menu mobile
-  const sidebar = document.getElementById("sidebar");
-  const overlay = document.getElementById("overlay");
-  document.getElementById("menu-btn").addEventListener("click", () => {
-    sidebar.classList.add("open");
-    overlay.classList.add("show");
-  });
-  overlay.addEventListener("click", () => {
-    sidebar.classList.remove("open");
-    overlay.classList.remove("show");
-  });
-
-  // copy all output
-  document.getElementById("copy-all").addEventListener("click", () => {
-    const active = document.querySelector(".tool.active .output");
-    if (active && active.textContent.trim()) {
-      copyText(active.textContent.trim());
-    } else {
-      toast("Tidak ada output", "error");
-    }
-  });
-
-  // copy on output click
-  document.querySelectorAll(".output[data-copyable]").forEach(el =>
-    el.addEventListener("click", () => {
-      if (el.textContent.trim()) copyText(el.textContent.trim());
-    }));
-
-  // persist inputs
-  document.querySelectorAll("[data-persist]").forEach(el => {
-    const key = "persist_" + el.id;
-    const saved = localStorage.getItem(key);
-    if (saved && !el.value) el.value = saved;
-    el.addEventListener("input", () => localStorage.setItem(key, el.value));
-  });
-
-  // password strength
-  ["pw-len", "pw-upper", "pw-lower", "pw-digit", "pw-sym"].forEach(id =>
-    document.getElementById(id)?.addEventListener("input", updateStrength));
-  updateStrength();
-
-  // keyboard shortcuts
-  document.addEventListener("keydown", e => {
-    if ((e.ctrlKey || e.metaKey) && e.key === "k") {
-      e.preventDefault();
-      document.getElementById("search").focus();
-    }
-  });
-
-  // init tools
-  timeNow();
-  convertColor();
-  genQR();
-});
-
-// register service worker for PWA
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("sw.js").catch(() => { });
-}
-
-// ═══════════════════════════════════════════════════
-// TIKTOK DOWNLOADER (v3)
-// ═══════════════════════════════════════════════════
-
+// TIKTOK
 function extractTikTokId(url) {
-  const m = url.match(/\/video\/(\d+)/) || url.match(/\/v\/(\d+)/);
+  var m = url.match(/\/video\/(\d+)/) || url.match(/\/v\/(\d+)/);
   return m ? m[1] : null;
 }
-
 async function tiktokFetch() {
-  const url = document.getElementById("tiktok-input").value.trim();
+  var url = document.getElementById("tiktok-input").value.trim();
   if (!url) return toast("Paste URL TikTok dulu", "error");
-
-  const id = extractTikTokId(url);
-  if (!id) return toast("URL TikTok tidak valid", "error");
-
+  if (!extractTikTokId(url)) return toast("URL TikTok tidak valid", "error");
   out("tiktok-output", '<span class="dim">⏳ Mengambil data...</span>');
-
   try {
-    // Pakai tikwm.com API (public, no key)
-    const apiUrl = `https://www.tikwm.com/api/?url=${encodeURIComponent(url)}&hd=1`;
-    const r = await fetch(apiUrl);
-    const d = await r.json();
-
-    if (d.code !== 0 || !d.data) {
-      return out("tiktok-output", `<span class="err">Gagal: ${d.msg || "tidak dapat data"}</span>`);
-    }
-
-    const v = d.data;
-    let html = "";
-
-    // thumbnail preview
-    if (v.cover) {
-      out("tiktok-preview",
-        `<img src="${v.cover}" alt="thumbnail" style="max-width:280px;border-radius:10px" onerror="this.style.display='none'">`);
-    }
-
+    var apiUrl = "https://www.tikwm.com/api/?url=" + encodeURIComponent(url) + "&hd=1";
+    var r = await fetch(apiUrl);
+    var d = await r.json();
+    if (d.code !== 0 || !d.data) return out("tiktok-output", '<span class="err">Gagal: ' + (d.msg || "tidak dapat data") + '</span>');
+    var v = d.data;
+    var html = "";
+    if (v.cover) out("tiktok-preview", '<img src="' + v.cover + '" style="max-width:280px;border-radius:10px">');
     html += kv("title", (v.title || "").slice(0, 100));
-    html += kv("author", "@" + (v.author?.unique_id || "?"));
-    html += kv("nickname", v.author?.nickname || "?");
+    html += kv("author", "@" + (v.author && v.author.unique_id ? v.author.unique_id : "?"));
     html += kv("duration", (v.duration || 0) + "s");
     html += kv("plays", (v.play_count || 0).toLocaleString());
     html += kv("likes", (v.digg_count || 0).toLocaleString());
-    html += kv("comments", (v.comment_count || 0).toLocaleString());
-    html += kv("shares", (v.share_count || 0).toLocaleString());
-    html += kv("music", v.music_info?.title || "?");
-
-    if (v.play) {
-      html += `<div style="margin-top:12px"><span class="key">video (no watermark):</span></div>`;
-      html += `<div><a href="${v.play}" target="_blank" style="color:var(--accent);word-break:break-all">${v.play}</a></div>`;
-    }
-    if (v.wmplay) {
-      html += `<div style="margin-top:6px"><span class="key">video (watermark):</span></div>`;
-      html += `<div><a href="${v.wmplay}" target="_blank" style="color:var(--text-dim);word-break:break-all">${v.wmplay}</a></div>`;
-    }
-    if (v.music) {
-      html += `<div style="margin-top:6px"><span class="key">audio:</span></div>`;
-      html += `<div><a href="${v.music}" target="_blank" style="color:var(--success);word-break:break-all">${v.music}</a></div>`;
-    }
-
+    if (v.play) html += '<div style="margin-top:12px"><span class="key">video (no watermark):</span></div><div><a href="' + v.play + '" target="_blank" style="color:var(--accent);word-break:break-all">' + v.play + '</a></div>';
+    if (v.music) html += '<div style="margin-top:6px"><span class="key">audio:</span></div><div><a href="' + v.music + '" target="_blank" style="color:var(--success);word-break:break-all">' + v.music + '</a></div>';
     out("tiktok-output", html);
-
-    // simpan URL untuk download
     window._tiktokData = v;
-
-    toast("✅ Data berhasil diambil", "success");
-  } catch (e) {
-    out("tiktok-output", `<span class="err">Error: ${e.message}</span>`);
-  }
+    toast("✅ Data diambil", "success");
+  } catch (e) { out("tiktok-output", '<span class="err">Error: ' + e.message + '</span>'); }
 }
-
 function tiktokDownload() {
-  const v = window._tiktokData;
+  var v = window._tiktokData;
   if (!v || !v.play) return toast("Klik 'Ambil Info' dulu", "error");
-  // langsung buka URL video di tab baru untuk download
   window.open(v.play, "_blank");
   toast("📥 Membuka video...", "success");
 }
-
 function tiktokAudio() {
-  const v = window._tiktokData;
+  var v = window._tiktokData;
   if (!v || !v.music) return toast("Klik 'Ambil Info' dulu", "error");
   window.open(v.music, "_blank");
   toast("🎵 Membuka audio...", "success");
 }
-...
+
+// INIT
+document.addEventListener("DOMContentLoaded", function() {
+  if (typeof applyIcons === "function") applyIcons();
+  initTheme();
+  document.getElementById("theme-toggle").addEventListener("click", function() { toggleTheme(); if (typeof applyIcons === "function") applyIcons(); });
+  document.querySelectorAll(".nav button").forEach(function(btn) {
+    btn.addEventListener("click", function() { switchTool(btn.dataset.tool); });
+  });
+  var last = localStorage.getItem("lastTool") || "hash";
+  switchTool(last);
+  document.getElementById("search").addEventListener("input", function(e) { filterTools(e.target.value); });
+  var sidebar = document.getElementById("sidebar");
+  var overlay = document.getElementById("overlay");
+  document.getElementById("menu-btn").addEventListener("click", function() { sidebar.classList.add("open"); overlay.classList.add("show"); });
+  overlay.addEventListener("click", function() { sidebar.classList.remove("open"); overlay.classList.remove("show"); });
+  document.getElementById("copy-all").addEventListener("click", function() {
+    var active = document.querySelector(".tool.active .output");
+    if (active && active.textContent.trim()) copyText(active.textContent.trim());
+    else toast("Tidak ada output", "error");
+  });
+  document.querySelectorAll(".output[data-copyable]").forEach(function(el) {
+    el.addEventListener("click", function() { if (el.textContent.trim()) copyText(el.textContent.trim()); });
+  });
+  document.querySelectorAll("[data-persist]").forEach(function(el) {
+    var key = "persist_" + el.id;
+    var saved = localStorage.getItem(key);
+    if (saved && !el.value) el.value = saved;
+    el.addEventListener("input", function() { localStorage.setItem(key, el.value); });
+  });
+  ["pw-len", "pw-upper", "pw-lower", "pw-digit", "pw-sym"].forEach(function(id) {
+    var el = document.getElementById(id); if (el) el.addEventListener("input", updateStrength);
+  });
+  updateStrength();
+  document.addEventListener("keydown", function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === "k") { e.preventDefault(); document.getElementById("search").focus(); }
+  });
+  timeNow(); convertColor(); genQR();
+});
