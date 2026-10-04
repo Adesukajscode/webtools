@@ -49,7 +49,7 @@ function build(){
       <div class="home-hero">
         <div class="home-hero-content">
           <div class="home-hero-badge">✦ Selamat Datang</div>
-          <h1>CyberToolbox</h1>
+          <h1 class="glitch" data-text="CyberToolbox">CyberToolbox</h1>
           <p>Kumpulan 30+ tools developer, downloader, media, AI, dan game — semua gratis, semua di browser. Klik menu di sidebar untuk mulai.</p>
           <div class="home-hero-stats">
             <div class="home-hero-stat"><b>30+</b>Tools</div>
@@ -64,7 +64,7 @@ function build(){
         <div class="home-creator-avatar">AF</div>
         <div class="home-creator-info">
           <div class="role">Creator & Developer</div>
-          <h2>Ade A.F</h2>
+          <h2 class="glitch" data-text="Ade A.F">Ade A.F</h2>
           <p>Pelajar yang membangun CyberToolbox dari nol — dari UI, backend functions, sampai integrasi AI. Web ini dibuat untuk belajar sekaligus memberikan tools berguna buat siapa saja yang butuh utility cepat.</p>
           <div class="home-creator-links">
             <a href="https://github.com/Adesukajscode/webtools" target="_blank" rel="noopener">
@@ -90,7 +90,7 @@ function build(){
         <div class="home-stat-card"><div class="home-stat-icon">🆓</div><div class="home-stat-num">Rp 0</div><div class="home-stat-lbl">Biaya</div></div>
       </div>
 
-      <div class="home-section-title">🎬 Video Showcase</div>
+      <div class="home-section-title glitch" data-text="🎬 Video Showcase">🎬 Video Showcase</div>
       <div class="home-section-sub">Kotak untuk menaruh video — <strong>klik slot kosong</strong> untuk isi, <strong>klik slot terisi</strong> untuk play.</div>
       <div class="home-video-grid" id="home-videos"></div>
     `;
