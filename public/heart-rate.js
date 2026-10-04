@@ -1,435 +1,280 @@
 (function(){"use strict";
-const $=id=>document.getElementById(id);
-const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const toast=window.toast||(m=>console.log(m));
+const $=id=>document.getElementById(id),T=window.toast||(m=>console.log(m));
+const C={fs:30,bufSec:12,warm:3,minB:42,maxB:200,pk:0.5,rf:0.32,minQ:0.35};
+let stream=null,vid=null,cv=null,ctx=null,wc=null,wx=null,on=!1,raf=null;
+let fps=0,fc=0,fpsT=0,lastT=0,samples=[],startT=0,bpm=0,bh=[],q=0,sat=0,filt=[],pk=[],torch=!1;
 
-// ═══════════════════════════════════════════════════════
-// CONFIG
-// ═══════════════════════════════════════════════════════
-const CFG={
-  targetFPS:30,
-  bufferSec:12,         // window analisis
-  minBPM:45,            // detak minimum valid
-  maxBPM:180,           // detak maksimum valid
-  warmupSec:3,          // tunggu stabil
-  measureSec:10,        // durasi hitung
-  peakThreshold:0.35,   // threshold peak detection
-  refractorySec:0.35,   // jarak minimum antar peak (BPM max ~170)
-  qualityMin:0.4        // threshold kualitas signal
-};
+const mean=a=>a.length?a.reduce((s,v)=>s+v,0)/a.length:0;
+const std=a=>{const m=mean(a);return Math.sqrt(a.reduce((s,v)=>s+(v-m)**2,0)/(a.length||1))};
+const norm=a=>{const m=mean(a),s=std(a)||1;return a.map(v=>(v-m)/s)};
 
-// IIR Butterworth bandpass 0.8-3Hz @ 30fps
-// Precomputed coefficients
-const IIR_B=[0.1365, 0, -0.1365];
-const IIR_A=[1, -1.7126, 0.7270];
-
-// ═══════════════════════════════════════════════════════
-// STATE
-// ═══════════════════════════════════════════════════════
-let stream=null, video=null, canvas=null, ctx=null, waveCanvas=null, waveCtx=null;
-let running=!1, fps=0, lastFrame=0, frameCount=0, fpsTime=0;
-let redBuf=[];         // rolling window raw red signal
-let filtered=[];       // filtered signal
-let timestamps=[];     // ms per sample
-let bpmHistory=[];     // rolling BPM
-let peaks=[];          // detected peaks (indices)
-let currentBPM=0;
-let quality=0;
-let measureStart=0;
-let state="idle";      // idle | warmup | measuring | done
-let filterState=[0,0]; // IIR delay state
-let bpmAvg=0;
-let lastBeatTime=0;
-
-// ═══════════════════════════════════════════════════════
-// CAMERA
-// ═══════════════════════════════════════════════════════
 async function startCam(){
-  const constraints=[
-    {video:{facingMode:{exact:"environment"},width:{ideal:320},height:{ideal:240},frameRate:{ideal:30}},audio:!1},
+  const A=[
+    {video:{facingMode:{exact:"environment"},width:{ideal:320},height:{ideal:240},frameRate:{ideal:30,max:30}},audio:!1},
     {video:{facingMode:"environment",width:{ideal:320},height:{ideal:240}},audio:!1},
-    {video:!0,audio:!1}
-  ];
-  let lastErr;
-  for(const c of constraints){
+    {video:{facingMode:"environment"},audio:!1},
+    {video:!0,audio:!1}];
+  let err;
+  for(const c of A){
     try{
       stream=await navigator.mediaDevices.getUserMedia(c);
-      // Coba nyalakan torch
       try{
-        const track=stream.getVideoTracks()[0];
-        const caps=track.getCapabilities?track.getCapabilities():{};
-        if(caps.torch){
-          await track.applyConstraints({advanced:[{torch:true}]});
-          window.__torchOn=true;
-        }else{
-          window.__torchOn=false;
-        }
-      }catch(e){window.__torchOn=false;console.warn("[hrm] torch fail:",e.message)}
-      return!0
-    }catch(e){lastErr=e}
+        const t=stream.getVideoTracks()[0],cap=t.getCapabilities?t.getCapabilities():{};
+        if(cap.torch){await t.applyConstraints({advanced:[{torch:!0}]});torch=!0}else torch=!1
+      }catch(e){torch=!1}
+      return
+    }catch(e){err=e}
   }
-  throw lastErr||Error("Kamera gagal")
+  throw err||Error("Kamera gagal")
 }
 
 function stopCam(){
-  running=!1;
   if(stream){
-    stream.getTracks().forEach(t=>{
-      try{t.applyConstraints({advanced:[{torch:false}]})}catch(e){}
-      t.stop()
-    });
+    stream.getTracks().forEach(t=>{try{t.applyConstraints({advanced:[{torch:!1}]})}catch(e){}try{t.stop()}catch(e){}});
     stream=null
   }
-  if(video)video.srcObject=null
+  if(vid)vid.srcObject=null
 }
 
-// ═══════════════════════════════════════════════════════
-// SIGNAL PROCESSING
-// ═══════════════════════════════════════════════════════
-// IIR filter 2nd order
-function applyIIR(sample){
-  const y=IIR_B[0]*sample + filterState[0];
-  const ns0=IIR_B[1]*sample - IIR_A[1]*y;
-  const ns1=IIR_B[2]*sample - IIR_A[2]*y;
-  filterState[0]=ns0;
-  filterState[1]=ns1;
-  return y
-}
-
-// Get average red from center region
-function sampleRed(){
-  const w=video.videoWidth,h=video.videoHeight;
-  if(!w||!h)return 0;
-  // Sampling center 40% kotak
-  const cx=Math.floor(w/2),cy=Math.floor(h/2);
-  const rw=Math.floor(w*0.2),rh=Math.floor(h*0.2);
-  const x0=cx-rw,y0=cy-rh;
+function sampleRGB(){
+  const w=vid.videoWidth,h=vid.videoHeight;if(!w||!h)return null;
+  const rw=w*0.25|0,rh=h*0.25|0,x0=(w-rw)/2|0,y0=(h-rh)/2|0;
   try{
-    const data=ctx.getImageData(x0,y0,rw*2,rh*2).data;
-    let r=0,g=0,b=0,n=0;
-    for(let i=0;i<data.length;i+=16){ // skip pixel, sampling sparse
-      r+=data[i];g+=data[i+1];b+=data[i+2];n++
-    }
-    if(!n)return 0;
-    // Kombinasi: red - green (green juga berubah karena blood flow)
-    return (r/n) - (g/n)*0.5
-  }catch(e){return 0}
+    const d=ctx.getImageData(x0,y0,rw,rh).data;
+    let r=0,g=0,b=0,n=0,s=0;
+    for(let i=0;i<d.length;i+=16){r+=d[i];g+=d[i+1];b+=d[i+2];if(d[i]>=250&&d[i+1]<=5&&d[i+2]<=5)s++;n++}
+    if(!n)return null;
+    return{r:r/n,g:g/n,b:b/n,sat:s/n}
+  }catch(e){return null}
 }
 
-// Normalize array
-function norm(arr){
-  if(!arr.length)return arr;
-  let mean=0;arr.forEach(v=>mean+=v);mean/=arr.length;
-  let variance=0;arr.forEach(v=>variance+=(v-mean)**2);variance/=arr.length;
-  const std=Math.sqrt(variance)||1;
-  return arr.map(v=>(v-mean)/std)
+function butter(lo,hi,fs){
+  const w1=Math.tan(Math.PI*lo/fs),n1=1+w1*Math.SQRT2+w1*w1;
+  const hp={b:[1/n1,-2/n1,1/n1],a:[1,2*(w1*w1-1)/n1,(1-w1*Math.SQRT2+w1*w1)/n1]};
+  const w2=Math.tan(Math.PI*hi/fs),n2=1+w2*Math.SQRT2+w2*w2;
+  const lp={b:[w2*w2/n2,2*w2*w2/n2,w2*w2/n2],a:[1,2*(w2*w2-1)/n2,(1-w2*Math.SQRT2+w2*w2)/n2]};
+  return{hp,lp}
 }
 
-// Peak detection
-function detectPeaks(signal, sampleRate){
-  const peaks=[];
-  const refractory=Math.floor(CFG.refractorySec*sampleRate);
-  let lastPeak=-refractory;
-  for(let i=1;i<signal.length-1;i++){
-    if(signal[i]>signal[i-1] && signal[i]>signal[i+1] && signal[i]>CFG.peakThreshold){
-      if(i-lastPeak>=refractory){
-        peaks.push(i);
-        lastPeak=i
-      }
-    }
+function iir(sig,c){
+  const o=new Array(sig.length).fill(0);let x1=0,x2=0,y1=0,y2=0;
+  const{b,a}=c;
+  for(let i=0;i<sig.length;i++){
+    const y=b[0]*sig[i]+b[1]*x1+b[2]*x2-a[1]*y1-a[2]*y2;
+    o[i]=y;x2=x1;x1=sig[i];y2=y1;y1=y
   }
-  return peaks
+  return o
 }
 
-// Hitung BPM dari interval peak
-function calcBPM(peaks,sampleRate){
-  if(peaks.length<2)return 0;
-  const intervals=[];
-  for(let i=1;i<peaks.length;i++){
-    const dt=(peaks[i]-peaks[i-1])/sampleRate;
-    if(dt>0){
-      const bpm=60/dt;
-      if(bpm>=CFG.minBPM&&bpm<=CFG.maxBPM)intervals.push(bpm)
-    }
+function detrend(a,w){
+  const o=new Array(a.length);
+  for(let i=0;i<a.length;i++){
+    const lo=Math.max(0,i-w),hi=Math.min(a.length,i+w+1);
+    let s=0;for(let j=lo;j<hi;j++)s+=a[j];
+    o[i]=a[i]-s/(hi-lo)
   }
-  if(!intervals.length)return 0;
-  // Median filter untuk buang outlier
-  intervals.sort((a,b)=>a-b);
-  const mid=Math.floor(intervals.length/2);
-  const median=intervals.length%2?intervals[mid]:(intervals[mid-1]+intervals[mid])/2;
-  // Average dari yang dekat median (±20%)
-  const filtered=intervals.filter(x=>Math.abs(x-median)/median<0.2);
-  const avg=filtered.reduce((a,b)=>a+b,0)/filtered.length;
-  return Math.round(avg)
+  return o
 }
 
-// Signal quality: 0-1
-function calcQuality(peaks,sampleRate){
-  if(peaks.length<3)return 0;
-  const intervals=[];
-  for(let i=1;i<peaks.length;i++)intervals.push((peaks[i]-peaks[i-1])/sampleRate);
-  const mean=intervals.reduce((a,b)=>a+b,0)/intervals.length;
-  const variance=intervals.reduce((s,x)=>s+(x-mean)**2,0)/intervals.length;
-  const cv=Math.sqrt(variance)/mean; // coefficient of variation
-  // CV rendah = kualitas tinggi
-  return Math.max(0,Math.min(1,1-cv*2))
+function findPeaks(s,fs){
+  const p=[],rf=fs*C.rf|0;let last=-rf;
+  for(let i=1;i<s.length-1;i++){
+    if(s[i]>s[i-1]&&s[i]>s[i+1]&&s[i]>C.pk&&i-last>=rf){p.push(i);last=i}
+  }
+  return p
 }
 
-// ═══════════════════════════════════════════════════════
-// MAIN LOOP
-// ═══════════════════════════════════════════════════════
+function bpmPeaks(p,fs){
+  if(p.length<3)return null;
+  const iv=[];for(let i=1;i<p.length;i++)iv.push((p[i]-p[i-1])/fs);
+  const srt=[...iv].sort((a,b)=>a-b),med=srt[srt.length/2|0];
+  const clean=iv.filter(x=>Math.abs(x-med)/med<0.25);
+  if(clean.length<2)return null;
+  const avg=clean.reduce((a,b)=>a+b,0)/clean.length,b=60/avg;
+  if(b<C.minB||b>C.maxB)return null;
+  return{bpm:Math.round(b),q:1-clean.length/iv.length}
+}
+
+function bpmAC(s,fs){
+  const n=s.length;if(n<60)return null;
+  const mn=fs*60/C.maxB|0,mx=fs*60/C.minB|0;
+  if(mx>=n-2)return null;
+  let bl=0,bc=-Infinity;
+  for(let l=mn;l<=mx;l++){
+    let sm=0;for(let i=0;i<n-l;i++)sm+=s[i]*s[i+l];
+    sm/=(n-l);
+    if(sm>bc){bc=sm;bl=l}
+  }
+  if(bl<=0)return null;
+  const b=60*fs/bl;
+  if(b<C.minB||b>C.maxB)return null;
+  return{bpm:Math.round(b),q:0.4}
+}
+
+function process(){
+  if(samples.length<30)return null;
+  const rA=samples.map(s=>s.r),gA=samples.map(s=>s.g),bA=samples.map(s=>s.b);
+  const rg=[];for(let i=0;i<samples.length;i++)rg.push(samples[i].r-samples[i].g);
+  const gb=[];for(let i=0;i<samples.length;i++)gb.push(samples[i].g-samples[i].b);
+  const satA=mean(samples.map(s=>s.satRatio));
+  const vRG=std(rg),vG=std(gA),vGB=std(gb);
+  let raw;
+  if(vRG>vG*1.2)raw=rg;else if(vG>vGB*1.2)raw=gA;else raw=gb;
+  const dt=detrend(raw,C.fs*0.75|0);
+  const co=butter(0.7,3.5,C.fs);
+  const f=iir(iir(dt,co.hp),co.lp);
+  return{ns:norm(f),sat:satA}
+}
+
 function loop(){
-  if(!running)return;
+  if(!on)return;
   const now=performance.now();
-  const elapsed=now-lastFrame;
-  // Frame rate control (~30fps)
-  if(elapsed<1000/CFG.targetFPS){
-    requestAnimationFrame(loop);
-    return
+  if(now-lastT<1000/C.fs-3){raf=requestAnimationFrame(loop);return}
+  lastT=now;
+  fc++;
+  if(now-fpsT>1000){
+    fps=Math.round(fc*1000/(now-fpsT));fc=0;fpsT=now;
+    const el=$("hrm-fps");if(el)el.textContent=fps+" FPS"
   }
-  lastFrame=now;
-
-  // FPS counter
-  frameCount++;
-  if(now-fpsTime>1000){
-    fps=Math.round(frameCount*1000/(now-fpsTime));
-    frameCount=0;fpsTime=now;
-    const fpsEl=$("hrm-fps");if(fpsEl)fpsEl.textContent=fps+" FPS"
-  }
-
-  if(video.readyState<2){requestAnimationFrame(loop);return}
-
-  // Grab frame
-  const w=video.videoWidth,h=video.videoHeight;
-  if(canvas.width!==w){canvas.width=w;canvas.height=h}
-  ctx.drawImage(video,0,0,w,h);
-
-  // Sample red
-  const r=sampleRed();
-  if(r<=0){requestAnimationFrame(loop);return}
-
-  redBuf.push(r);
-  timestamps.push(now);
-
-  // Keep window
-  const maxSamples=CFG.bufferSec*CFG.targetFPS;
-  while(redBuf.length>maxSamples){redBuf.shift();timestamps.shift()}
-
-  // Filter
-  const detrended=r-(redBuf.reduce((a,b)=>a+b,0)/redBuf.length);
-  const y=applyIIR(detrended);
-  filtered.push(y);
-  while(filtered.length>maxSamples)filtered.shift();
-
-  // Peak detect (setiap 500ms)
-  if(now-measureStart>500||!measureStart){
-    if(filtered.length>CFG.targetFPS*2){
-      const normS=norm(filtered);
-      peaks=detectPeaks(normS,CFG.targetFPS);
-      quality=calcQuality(peaks,CFG.targetFPS);
-      const bpm=calcBPM(peaks,CFG.targetFPS);
-      if(bpm>0&&quality>CFG.qualityMin){
-        currentBPM=bpm;
-        bpmHistory.push(bpm);
-        while(bpmHistory.length>8)bpmHistory.shift();
-        // Average dari 8 terakhir
-        bpmAvg=Math.round(bpmHistory.reduce((a,b)=>a+b,0)/bpmHistory.length)
+  if(vid.readyState<2){raf=requestAnimationFrame(loop);return}
+  const w=vid.videoWidth,h=vid.videoHeight;
+  if(cv.width!==w){cv.width=w;cv.height=h}
+  ctx.drawImage(vid,0,0,w,h);
+  const s=sampleRGB();
+  if(!s){raf=requestAnimationFrame(loop);return}
+  samples.push({r:s.r,g:s.g,b:s.b,satRatio:s.satRatio});
+  const mx=C.bufSec*C.fs;
+  while(samples.length>mx)samples.shift();
+  const el=now-startT,inW=el<C.warm*1000;
+  if(!inW&&now-(window.__lp||0)>400){
+    window.__lp=now;
+    const p=process();
+    if(p){
+      filt=p.ns;sat=p.sat;
+      const pks=findPeaks(p.ns,C.fs);pk=pks;
+      let res=bpmPeaks(pks,C.fs)||bpmAC(p.ns,C.fs);
+      let qq=0;
+      if(pks.length>=3){
+        const iv=[];for(let i=1;i<pks.length;i++)iv.push((pks[i]-pks[i-1])/C.fs);
+        const m=mean(iv),s2=std(iv),cvv=s2/(m||1);
+        qq=Math.max(0,Math.min(1,1-cvv*1.8));
+        if(std(p.ns)>0.3)qq=Math.min(1,qq+0.1)
+      }
+      q=qq;
+      if(res&&qq>=C.minQ){
+        bh.push(res.bpm);while(bh.length>7)bh.shift();
+        const srt=[...bh].sort((a,b)=>a-b);
+        bpm=srt[srt.length/2|0]
       }
     }
-    measureStart=now
   }
-
-  // Update UI
-  updateUI();
-  drawWave();
-
-  requestAnimationFrame(loop)
+  updateUI(el);drawWave();
+  raf=requestAnimationFrame(loop)
 }
 
-// ═══════════════════════════════════════════════════════
-// UI
-// ═══════════════════════════════════════════════════════
-function updateUI(){
-  const bpmEl=$("hrm-bpm");
-  const statusEl=$("hrm-status");
-  const qualEl=$("hrm-quality-fill");
-  const qLabel=$("hrm-quality-label");
-
-  if(bpmEl)bpmEl.textContent=bpmAvg>0?bpmAvg:"--";
-
-  if(qualEl){
-    const pct=Math.round(quality*100);
-    qualEl.style.width=pct+"%";
-    qualEl.style.background=pct>70?"linear-gradient(90deg,#22c55e,#3b82f6)":pct>40?"linear-gradient(90deg,#f59e0b,#fbbf24)":"linear-gradient(90deg,#ef4444,#f472b6)"
+function updateUI(el){
+  const b=$("hrm-bpm"),st=$("hrm-status"),qf=$("hrm-quality-fill"),ql=$("hrm-quality-label");
+  if(b)b.textContent=bpm>0?bpm:"--";
+  if(qf){
+    const p=Math.round(q*100);qf.style.width=p+"%";
+    qf.style.background=p>=70?"linear-gradient(90deg,#22c55e,#3b82f6)":p>=40?"linear-gradient(90deg,#f59e0b,#fbbf24)":"linear-gradient(90deg,#ef4444,#f472b6)"
   }
-  if(qLabel){
-    const pct=Math.round(quality*100);
-    qLabel.textContent=pct+"%"
-  }
-
-  if(statusEl){
-    let txt="Menunggu sinyal...",cls="";
-    if(quality>=0.7&&bpmAvg>0){txt="✅ Sinyal bagus · Mengukur";cls="ok"}
-    else if(quality>=0.4&&bpmAvg>0){txt="⚠️ Sinyal sedang · Cari posisi stabil";cls="warn"}
-    else if(redBuf.length>0){txt="❌ Sinyal lemah · Tekan lebih rata di kamera";cls="err"}
-    statusEl.textContent=txt;
-    statusEl.className="hrm-status "+(cls?"hrm-"+cls:"")
+  if(ql)ql.textContent=Math.round(q*100)+"%";
+  if(st){
+    let t="",c="";
+    if(el<C.warm*1000){t="⏱ Kalibrasi "+Math.ceil((C.warm*1000-el)/1000)+"s — jangan gerakkan jari";c="warn"}
+    else if(samples.length<30){t="⏳ Mengumpulkan data...";c="warn"}
+    else if(q>=0.7&&bpm>0){t="✅ Sinyal bagus · "+bpm+" BPM";c="ok"}
+    else if(q>=0.4&&bpm>0){t="⚠️ Sinyal sedang — cari tekanan pas";c="warn"}
+    else if(sat>0.5&&!torch){t="💡 Flash OFF — nyalakan manual";c="err"}
+    else{t="❌ Sinyal lemah — tekan jari lebih rata";c="err"}
+    st.textContent=t;st.className="hrm-status"+(c?" hrm-"+c:"")
   }
 }
 
 function drawWave(){
-  if(!waveCanvas||!waveCtx)return;
-  const w=waveCanvas.width,h=waveCanvas.height;
-  waveCtx.clearRect(0,0,w,h);
-  // Grid
-  waveCtx.strokeStyle="rgba(59,130,246,0.08)";
-  waveCtx.lineWidth=1;
-  for(let y=0;y<h;y+=20){waveCtx.beginPath();waveCtx.moveTo(0,y);waveCtx.lineTo(w,y);waveCtx.stroke()}
-  for(let x=0;x<w;x+=20){waveCtx.beginPath();waveCtx.moveTo(x,0);waveCtx.lineTo(x,h);waveCtx.stroke()}
-
-  if(filtered.length<4)return;
-  const data=norm(filtered);
-  const N=data.length;
-  const step=w/N;
-
-  // Gradient
-  const grad=waveCtx.createLinearGradient(0,0,0,h);
-  grad.addColorStop(0,"#3b82f6");
-  grad.addColorStop(0.5,"#06b6d4");
-  grad.addColorStop(1,"#a78bfa");
-
-  // Waveform
-  waveCtx.beginPath();
-  waveCtx.strokeStyle=grad;
-  waveCtx.lineWidth=2.5;
-  waveCtx.lineJoin="round";
+  if(!wc||!wx)return;
+  const w=wc.width,h=wc.height;wx.clearRect(0,0,w,h);
+  wx.strokeStyle="rgba(59,130,246,0.08)";wx.lineWidth=1;
+  for(let y=0;y<h;y+=20){wx.beginPath();wx.moveTo(0,y);wx.lineTo(w,y);wx.stroke()}
+  for(let x=0;x<w;x+=20){wx.beginPath();wx.moveTo(x,0);wx.lineTo(x,h);wx.stroke()}
+  if(!filt.length)return;
+  const N=filt.length,step=w/N;
+  const g=wx.createLinearGradient(0,0,0,h);
+  g.addColorStop(0,"#3b82f6");g.addColorStop(.5,"#06b6d4");g.addColorStop(1,"#a78bfa");
+  wx.beginPath();wx.strokeStyle=g;wx.lineWidth=2.2;wx.lineJoin="round";
   for(let i=0;i<N;i++){
-    const x=i*step;
-    const y=h/2 - data[i]*(h/2-10)*0.7;
-    if(i===0)waveCtx.moveTo(x,y);
-    else waveCtx.lineTo(x,y)
+    const x=i*step,y=h/2-filt[i]*(h/2-8)*0.6;
+    if(i===0)wx.moveTo(x,y);else wx.lineTo(x,y)
   }
-  waveCtx.stroke();
-
-  // Peaks overlay
-  waveCtx.fillStyle="#ef4444";
-  peaks.forEach(p=>{
+  wx.stroke();
+  wx.fillStyle="#ef4444";
+  pk.forEach(p=>{
     if(p>=N)return;
-    const x=p*step;
-    const y=h/2 - data[p]*(h/2-10)*0.7;
-    waveCtx.beginPath();
-    waveCtx.arc(x,y,4,0,Math.PI*2);
-    waveCtx.fill();
-    waveCtx.strokeStyle="rgba(239,68,68,0.4)";
-    waveCtx.lineWidth=1;
-    waveCtx.beginPath();
-    waveCtx.moveTo(x,y);
-    waveCtx.lineTo(x,h);
-    waveCtx.stroke()
+    const x=p*step,y=h/2-filt[p]*(h/2-8)*0.6;
+    wx.beginPath();wx.arc(x,y,3.5,0,Math.PI*2);wx.fill()
   })
 }
 
-// ═══════════════════════════════════════════════════════
-// PREVIEW (jari di kamera)
-// ═══════════════════════════════════════════════════════
 function startPreview(){
-  const prev=$("hrm-preview");
-  if(!prev||!video)return;
-  const pv=prev.getContext("2d");
+  const p=$("hrm-preview");if(!p||!vid)return;
+  const pc=p.getContext("2d");
   function tick(){
-    if(!running)return;
-    if(video.readyState>=2){
-      prev.width=video.videoWidth||320;
-      prev.height=video.videoHeight||240;
-      pv.drawImage(video,0,0,prev.width,prev.height);
-      // Center indicator
-      const w=prev.width,h=prev.height;
-      const cw=Math.floor(w*0.4),ch=Math.floor(h*0.4);
-      pv.strokeStyle="rgba(59,130,246,0.8)";
-      pv.lineWidth=3;
-      pv.setLineDash([8,6]);
-      pv.strokeRect((w-cw)/2,(h-ch)/2,cw,ch);
-      pv.setLineDash([]);
-      pv.fillStyle="rgba(59,130,246,0.9)";
-      pv.font="bold 12px monospace";
-      pv.textAlign="center";
-      pv.fillText("Taruh jari di sini",w/2,h/2-4)
+    if(!on)return;
+    if(vid.readyState>=2){
+      p.width=vid.videoWidth||320;p.height=vid.videoHeight||240;
+      pc.drawImage(vid,0,0,p.width,p.height);
+      const w=p.width,h=p.height,cw=w*0.5|0,ch=h*0.5|0;
+      pc.strokeStyle="rgba(59,130,246,0.9)";pc.lineWidth=3;pc.setLineDash([8,6]);
+      pc.strokeRect((w-cw)/2,(h-ch)/2,cw,ch);pc.setLineDash([]);
+      pc.fillStyle="rgba(59,130,246,0.95)";pc.font="bold 13px monospace";pc.textAlign="center";
+      pc.fillText("Taruh jari di sini",w/2,h/2-4)
     }
     requestAnimationFrame(tick)
   }
   tick()
 }
 
-// ═══════════════════════════════════════════════════════
-// CONTROLS
-// ═══════════════════════════════════════════════════════
 async function start(){
-  const btn=$("hrm-start"),statusEl=$("hrm-status");
+  const btn=$("hrm-start");if(!btn)return;
   btn.disabled=!0;btn.textContent="⏳ Memulai...";
   try{
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)throw Error("Browser tidak support kamera");
     await startCam();
-    video=$("hrm-video");
-    video.srcObject=stream;
-    video.setAttribute("playsinline","");
-    video.muted=!0;
-    await video.play();
-    canvas=$("hrm-canvas");
-    ctx=canvas.getContext("2d",{willReadFrequently:!0});
-    waveCanvas=$("hrm-wave");
-    waveCtx=waveCanvas.getContext("2d");
-    waveCanvas.width=waveCanvas.clientWidth*2;
-    waveCanvas.height=waveCanvas.clientHeight*2;
-    waveCtx.scale(1,1);
-
-    // reset
-    redBuf=[];filtered=[];timestamps=[];peaks=[];bpmHistory=[];
-    currentBPM=0;bpmAvg=0;quality=0;filterState=[0,0];
-    lastFrame=0;fpsTime=performance.now();frameCount=0;
-
-    running=!0;
-    measureStart=0;
-    loop();
-    startPreview();
-
-    btn.textContent="⏹ Stop";
+    vid=$("hrm-video");vid.srcObject=stream;vid.setAttribute("playsinline","");vid.muted=!0;
+    await vid.play();
+    await new Promise(r=>{if(vid.readyState>=2)return r();vid.onloadedmetadata=()=>r();setTimeout(r,1500)});
+    cv=$("hrm-canvas");ctx=cv.getContext("2d",{willReadFrequently:!0});
+    wc=$("hrm-wave");
+    if(wc){wx=wc.getContext("2d");wc.width=wc.clientWidth*2;wc.height=wc.clientHeight*2}
+    samples=[];filt=[];pk=[];bh=[];bpm=0;q=0;sat=0;fps=0;fc=0;
+    fpsT=performance.now();lastT=0;startT=performance.now();window.__lp=0;
+    on=!0;raf=requestAnimationFrame(loop);startPreview();
+    btn.textContent="⏹ Stop";btn.classList.remove("primary");btn.classList.add("danger");
     btn.disabled=!1;
-    btn.classList.remove("primary");
-    btn.classList.add("danger");
-    if(statusEl){statusEl.textContent="🎯 Tempelkan jari ke kamera + flash";statusEl.className="hrm-status hrm-warn"}
-    if(!window.__torchOn)toast("⚠️ Flash tidak tersedia — nyalakan manual","warn");
-    else toast("💡 Flash aktif — tempelkan jari","success")
+    T(torch?"💡 Flash aktif — tempelkan jari":"⚠️ Flash OFF — nyalakan manual",torch?"success":"warn")
   }catch(e){
-    console.error("[hrm] start fail:",e);
+    console.error("[hrm]",e);
     btn.disabled=!1;btn.textContent="▶ Mulai Ukur";
-    if(statusEl){statusEl.textContent="❌ "+e.message;statusEl.className="hrm-status hrm-err"}
-    toast("Gagal: "+e.message,"error")
+    const st=$("hrm-status");if(st){st.textContent="❌ "+e.message;st.className="hrm-status hrm-err"}
+    T("Gagal: "+e.message,"error");try{stopCam()}catch(e2){}
   }
 }
 
 function stop(){
+  on=!1;if(raf)cancelAnimationFrame(raf);
   stopCam();
   const btn=$("hrm-start");
-  btn.textContent="▶ Mulai Ukur";
-  btn.classList.remove("danger");
-  btn.classList.add("primary");
-  const statusEl=$("hrm-status");
-  if(statusEl){
-    if(bpmAvg>0){
-      statusEl.textContent="✅ Selesai · BPM rata-rata "+bpmAvg;
-      statusEl.className="hrm-status hrm-ok"
-    }else{
-      statusEl.textContent="⏹ Berhenti · Tidak ada hasil";
-      statusEl.className="hrm-status"
-    }
+  if(btn){btn.textContent="▶ Mulai Ukur";btn.classList.remove("danger");btn.classList.add("primary")}
+  const st=$("hrm-status");
+  if(st){
+    if(bpm>0){st.textContent="✅ Selesai · BPM: "+bpm;st.className="hrm-status hrm-ok"}
+    else{st.textContent="⏹ Berhenti — tidak ada sinyal";st.className="hrm-status"}
   }
-  // Clear canvas
-  if(waveCtx&&waveCanvas)waveCtx.clearRect(0,0,waveCanvas.width,waveCanvas.height);
-  if(ctx&&canvas)ctx.clearRect(0,0,canvas.width,canvas.height)
+  if(wx&&wc)wx.clearRect(0,0,wc.width,wc.height);
+  if(ctx&&cv)ctx.clearRect(0,0,cv.width,cv.height)
 }
 
-// ═══════════════════════════════════════════════════════
-// BUILD UI
-// ═══════════════════════════════════════════════════════
 function build(){
   if($("tool-hrm"))return;
   const nav=$("nav"),ct=document.querySelector(".content");
@@ -437,21 +282,18 @@ function build(){
   if(!nav.querySelector('button[data-tool="hrm"]')){
     const b=document.createElement("button");b.dataset.tool="hrm";
     b.innerHTML='<span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span> Heart Rate';
-    const a=nav.querySelector('button[data-tool="face"]')||nav.querySelector('button[data-tool="hands"]')||nav.querySelector('button[data-tool="device"]');
+    const a=nav.querySelector('button[data-tool="face"]')||nav.querySelector('button[data-tool="hands"]');
     if(a&&a.nextSibling)nav.insertBefore(b,a.nextSibling);else nav.appendChild(b)
   }
   if(!$("tool-hrm")){
     const s=document.createElement("section");s.id="tool-hrm";s.className="tool";
     s.innerHTML=`
-      <div class="tool-head"><h2>🫀 Heart Rate Monitor</h2><p>Ukur detak jantung via kamera (rPPG) — jari di kamera + flash ON</p></div>
-      <div class="hrm-warn">⚠️ <strong>Bukan alat medis.</strong> Untuk edukasi & tracking personal. Akurasi ~70-85%. Untuk diagnosis, konsultasi dokter.</div>
+      <div class="tool-head"><h2>🫀 Heart Rate Monitor</h2><p>Ukur detak jantung via kamera (rPPG)</p></div>
+      <div class="hrm-warn">⚠️ <strong>Bukan alat medis.</strong> Edukasi & tracking personal. Akurasi ~70-85%.</div>
       <div class="hrm-layout">
         <div class="hrm-left">
           <div class="hrm-display">
-            <div class="hrm-bpm-wrap">
-              <div class="hrm-bpm" id="hrm-bpm">--</div>
-              <div class="hrm-unit">BPM</div>
-            </div>
+            <div class="hrm-bpm-wrap"><div class="hrm-bpm" id="hrm-bpm">--</div><div class="hrm-unit">BPM</div></div>
             <div class="hrm-icon">🫀</div>
           </div>
           <div class="hrm-quality-wrap">
@@ -470,40 +312,28 @@ function build(){
             <video id="hrm-video" playsinline muted></video>
             <canvas id="hrm-canvas" style="display:none"></canvas>
           </div>
-          <div class="hrm-wave-wrap">
-            <canvas id="hrm-wave"></canvas>
-          </div>
+          <div class="hrm-wave-wrap"><canvas id="hrm-wave"></canvas></div>
         </div>
       </div>
       <div class="hrm-tips">
         <div class="hrm-tips-title">📋 Cara Pakai</div>
         <ol>
           <li>Tekan <strong>Mulai Ukur</strong> → izinkan kamera</li>
-          <li><strong>Tempelkan ujung jari telunjuk</strong> menutupi lensa kamera belakang</li>
-          <li>Pastikan <strong>flash menyala</strong> (otomatis kalau device support)</li>
-          <li>Jangan gerakkan jari — tekan rata selama <strong>10-15 detik</strong></li>
-          <li>Tunggu angka BPM stabil</li>
+          <li><strong>Tempelkan ujung jari telunjuk</strong> ke kamera belakang</li>
+          <li>Tunggu <strong>3 detik kalibrasi</strong></li>
+          <li>Tahan <strong>10-15 detik</strong> — BPM muncul saat quality ≥ 40%</li>
         </ol>
-        <div class="hrm-tips-note">💡 <strong>Tips:</strong> jari jangan terlalu kuat (pucat = no signal), jangan terlalu lemah (bocor cahaya). Cari tekanan yang pas sampai waveform muncul.</div>
+        <div class="hrm-tips-note">💡 Jari jangan terlalu kuat (pucat = no signal), jangan lemah (bocor cahaya).</div>
       </div>`;
     const a=ct.querySelector("#tool-device")||ct.querySelector("#tool-face");
     if(a&&a.nextSibling)ct.insertBefore(s,a.nextSibling);else ct.appendChild(s)
   }
   if(window.TOOL_TITLES)window.TOOL_TITLES.hrm="Heart Rate";
-  $("hrm-start").addEventListener("click",()=>{
-    if(running)stop();
-    else start()
-  })
+  $("hrm-start").addEventListener("click",()=>{on?stop():start()})
 }
 
 if(window.registerTool)window.registerTool("hrm",()=>{});
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",()=>setTimeout(build,900));
 else setTimeout(build,900);
-
-window.HeartRate={
-  start,stop,
-  isRunning:()=>running,
-  getBPM:()=>bpmAvg,
-  getQuality:()=>quality
-};
+window.HeartRate={start,stop,isRunning:()=>on,getBPM:()=>bpm,getQuality:()=>q};
 })();
