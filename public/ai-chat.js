@@ -2,18 +2,19 @@
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const toast=window.toast||(m=>console.log(m));
-const API="https://text.pollinations.ai/openai";
+const API="/api/chat";
 
 // ═══ MODEL LIST — semua gratis di Pollinations ═══
 const MODELS=[
-  {id:"openai",           name:"🤖 OpenAI",         desc:"GPT-4o mini — seimbang"},
-  {id:"openai-fast",      name:"⚡ OpenAI Fast",    desc:"Cepat, ringan"},
-  {id:"openai-large",     name:"🧠 OpenAI Large",   desc:"Lebih pintar (slower)"},
-  {id:"mistral",          name:"🌪 Mistral",        desc:"Alternatif Eropa"},
-  {id:"qwen-coder",       name:"💻 Qwen Coder",     desc:"Expert coding"},
-  {id:"deepseek-reasoning",name:"🔍 DeepSeek R1",   desc:"Reasoning + math"},
-  {id:"llama-3.3-70b",    name:"🦙 Llama 3.3 70B",  desc:"Meta, umum"},
-  {id:"phi",              name:"🧪 Phi",            desc:"Kecil & cerdas"}
+  {id:"llama-3.3-70b-versatile",       name:"🦙 Llama 3.3 70B",  desc:"Seimbang, paling pintar"},
+  {id:"llama-3.1-8b-instant",          name:"⚡ Llama 3.1 8B",   desc:"Sangat cepat (instan)"},
+  {id:"meta-llama/llama-4-maverick-17b-128e-instruct", name:"🦙 Llama 4 Maverick", desc:"Generasi terbaru Meta"},
+  {id:"meta-llama/llama-4-scout-17b-16e-instruct",     name:"🦙 Llama 4 Scout",    desc:"Cepat & ringan"},
+  {id:"qwen/qwen3-32b",                name:"💻 Qwen 3 32B",     desc:"Expert coding & multibahasa"},
+  {id:"openai/gpt-oss-20b",            name:"🤖 GPT-OSS 20B",   desc:"OpenAI open-source"},
+  {id:"openai/gpt-oss-120b",           name:"🧠 GPT-OSS 120B",  desc:"Paling besar"},
+  {id:"gemma2-9b-it",                  name:"💎 Gemma 2 9B",     desc:"Google Gemma"},
+  {id:"allam-2-7b",                    name:"🌍 Allam 2 7B",     desc:"Arabic + general"}
 ];
 
 const SYS=`Kamu NEXA, asisten AI ramah untuk website CyberToolbox. Website ini punya 30+ tools: downloader (TikTok/YouTube/IG/FB/Spotify/APK), media (AI Upscale, Color Grading, Video Stabilizer), AI/CV (Face Recognition, Hand Tracking), game (Game Arcade, Slot, YouTube Player, Wikipedia), utility (Hash, JWT, QR, Password, dll).
@@ -23,7 +24,7 @@ const ROBOT_SVG=`<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><
 
 let panel=null,fab=null,busy=!1;
 let history=[];
-let selectedModel="openai";
+let selectedModel="llama-3.3-70b-versatile";
 
 // Load dari storage
 try{
@@ -90,21 +91,23 @@ async function askAI(userMsg,tryModel){
     const r=await fetch(API,{
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({model:mdl,messages:msgs,stream:!1,private:!0,seed:Math.floor(Math.random()*99999)}),
+      body:JSON.stringify({model:mdl,messages:msgs.filter(m=>m.role!=="system")}),
       signal:ctrl.signal
     });
     clearTimeout(timeout);
-    if(!r.ok)throw Error("HTTP "+r.status);
     const d=await r.json();
-    const reply=d&&d.choices&&d.choices[0]&&d.choices[0].message&&d.choices[0].message.content;
-    if(!reply||!reply.trim())throw Error("Respons kosong");
-    return{reply:reply.trim(),model:mdl}
+    if(!r.ok||!d.ok){
+      const err=(d&&d.error)||("HTTP "+r.status);
+      throw Error(err)
+    }
+    if(!d.reply||!d.reply.trim())throw Error("Respons kosong");
+    return{reply:d.reply.trim(),model:d.model||mdl}
   }catch(e){
     clearTimeout(timeout);
     // Fallback ke openai kalau model lain gagal
-    if(mdl!=="openai"){
-      console.warn("[ai] "+mdl+" gagal, fallback ke openai:",e.message);
-      return await askAI(userMsg,"openai")
+    if(mdl!=="llama-3.3-70b-versatile"){
+      console.warn("[ai] "+mdl+" gagal, fallback ke llama-3.3-70b:",e.message);
+      return await askAI(userMsg,"llama-3.3-70b-versatile")
     }
     throw e
   }
